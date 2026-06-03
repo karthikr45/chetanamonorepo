@@ -1,0 +1,16 @@
+{
+  "expo": {
+    "name": "SVBK Parent",
+    "slug": "svbk-parent",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "scheme": "svbkparent",
+    "ios": { "supportsTablet": true, "bundleIdentifier": "in.edu.svbk.parent" },
+    "android": { "package": "in.edu.svbk.parent" },
+    "plugins": ["expo-router", "expo-secure-store"],
+    "extra": {
+      "apiBaseUrl": "http://localhost:3001/api",
+      "parentWebUrl": "http://localhost:3002"
+    }
+  }
+}

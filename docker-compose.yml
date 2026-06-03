@@ -1,0 +1,85 @@
+# Local / staging stack: Postgres + API + admin + parent.
+# Usage:
+#   cp .env.example .env   # fill DB_PASSWORD, JWT secrets, SMTP, etc.
+#   docker compose up --build
+#
+# Production note: API runs with DB_SYNC unset (synchronize:false) and
+# applies pending TypeORM migrations on boot. Generate the Init baseline
+# before the first deploy (see api/src/data-source.ts).
+
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${DB_USERNAME:-postgres}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-postgres}
+      POSTGRES_DB: ${DB_NAME:-svbk}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USERNAME:-postgres}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  api:
+    build:
+      context: .
+      dockerfile: api/Dockerfile
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      NODE_ENV: production
+      DB_HOST: db
+      DB_PORT: 5432
+      DB_USERNAME: ${DB_USERNAME:-postgres}
+      DB_PASSWORD: ${DB_PASSWORD:-postgres}
+      DB_NAME: ${DB_NAME:-svbk}
+      DB_SYNC: "false"
+      JWT_SECRET: ${JWT_SECRET}
+      JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET}
+      CORS_ORIGINS: ${CORS_ORIGINS:-*}
+      CLIENT_URL: ${CLIENT_URL:-http://localhost:3000}
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASS: ${SMTP_PASS:-}
+      SMTP_FROM: ${SMTP_FROM:-SVBK <no-reply@svbk.edu.in>}
+    ports:
+      - "3001:3001"
+    healthcheck:
+      test:
+        ["CMD", "node", "-e", "fetch('http://localhost:3001/api/healthz').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+
+  admin:
+    build:
+      context: .
+      dockerfile: web/admin/Dockerfile
+      args:
+        NEXT_PUBLIC_API_URL: ${ADMIN_API_URL:-http://localhost:3001/api}
+    restart: unless-stopped
+    depends_on:
+      - api
+    ports:
+      - "3000:3000"
+
+  parent:
+    build:
+      context: .
+      dockerfile: web/parent/Dockerfile
+      args:
+        NEXT_PUBLIC_API_URL: ${PARENT_API_URL:-http://localhost:3001/api}
+    restart: unless-stopped
+    depends_on:
+      - api
+    ports:
+      - "3002:3000"
+
+volumes:
+  pgdata:

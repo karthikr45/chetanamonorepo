@@ -1,0 +1,15 @@
+{
+  "expo": {
+    "name": "SVBK Admin",
+    "slug": "svbk-admin",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "scheme": "svbkadmin",
+    "ios": { "supportsTablet": true, "bundleIdentifier": "in.edu.svbk.admin" },
+    "android": { "package": "in.edu.svbk.admin" },
+    "plugins": ["expo-router"],
+    "extra": {
+      "apiBaseUrl": "http://localhost:3001/api"
+    }
+  }
+}

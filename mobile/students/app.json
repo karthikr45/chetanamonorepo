@@ -1,0 +1,15 @@
+{
+  "expo": {
+    "name": "SVBK Students",
+    "slug": "svbk-students",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "scheme": "svbkstudents",
+    "ios": { "supportsTablet": true, "bundleIdentifier": "in.edu.svbk.students" },
+    "android": { "package": "in.edu.svbk.students" },
+    "plugins": ["expo-router"],
+    "extra": {
+      "apiBaseUrl": "http://localhost:3001/api"
+    }
+  }
+}
