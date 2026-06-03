@@ -269,7 +269,7 @@ INDEX  (tenant_id, email)              └─ idx_parent_otps_tenant_email
 Brief — these are the tables every other entity scopes by:
 
 - `tenants` — one row per school. `tenantCode` (unique), `tenantName`, `medium`, `boardType`, address fields, `clientId`/`secretKey`, `isActive`.
-- `tenant_configs` — per-(tenant, env) credentials: storage (S3/etc.), payment gateway keys, SMTP. Secrets live here, not in env files.
+- `tenant_configs` — per-(tenant, env) credentials: storage (S3/etc.), payment gateway keys, SMTP. Secrets live here, not in env files. Also holds branding (`logo_url`, `receipt_logo_url`, `domain_url`) and the parent-facing legal links `privacy_policy_url`, `terms_and_conditions_url`, `refund_policy_url`. The non-secret subset is served to the parent portal / public pay via `GET /parent/config?url=<window.location.href>`, which matches the host against `domain_url` and picks the row whose `environment_type` matches `APP_ENV`.
 - `academic_years` — per-tenant. `(academic_year, isCurrentYear, isActive, tenantId)`. Unique on `academic_year`.
 - `admins` — both super-admins and per-tenant admins. `role enum(super_admin, admin, parent)`, `tenantId` (null for super), `passwordHash`, `refreshTokenHash`.
 - `users` — placeholder for non-admin user types (currently lightly used).

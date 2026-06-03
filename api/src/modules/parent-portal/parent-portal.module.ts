@@ -13,6 +13,7 @@ import { AcademicYearsModule } from '../academic-years/academic-years.module';
 import { TenantConfigsModule } from '../tenant-configs/tenant-configs.module';
 import { ParentPortalService } from './parent-portal.service';
 import { ParentPortalController } from './parent-portal.controller';
+import { ParentPortalPublicController } from './parent-portal-public.controller';
 
 @Module({
   imports: [
@@ -31,7 +32,7 @@ import { ParentPortalController } from './parent-portal.controller';
     TenantConfigsModule,
   ],
   providers: [ParentPortalService],
-  controllers: [ParentPortalController],
+  controllers: [ParentPortalController, ParentPortalPublicController],
   exports: [ParentPortalService],
 })
 export class ParentPortalModule {}

@@ -60,6 +60,20 @@ export class CreateTenantConfigDto {
   @IsOptional()
   domainUrl?: string;
 
+  // ─── Legal / Policy URLs ──────────────────────────────────
+
+  @IsString()
+  @IsOptional()
+  privacyPolicyUrl?: string;
+
+  @IsString()
+  @IsOptional()
+  termsAndConditionsUrl?: string;
+
+  @IsString()
+  @IsOptional()
+  refundPolicyUrl?: string;
+
   // ─── File Storage ─────────────────────────────────────────
 
   @IsString()

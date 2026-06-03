@@ -62,6 +62,17 @@ export class TenantConfig {
   @Column({ name: 'domain_url', type: 'text', nullable: true })
   domainUrl: string | null;
 
+  // ─── Legal / Policy URLs (shown in the parent portal & public pay) ──
+
+  @Column({ name: 'privacy_policy_url', type: 'text', nullable: true })
+  privacyPolicyUrl: string | null;
+
+  @Column({ name: 'terms_and_conditions_url', type: 'text', nullable: true })
+  termsAndConditionsUrl: string | null;
+
+  @Column({ name: 'refund_policy_url', type: 'text', nullable: true })
+  refundPolicyUrl: string | null;
+
   // ─── File Storage ─────────────────────────────────────────
 
   @Column({ name: 'storage_access_key', type: 'text', nullable: true })

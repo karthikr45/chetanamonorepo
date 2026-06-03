@@ -4,17 +4,91 @@ import {
   ConflictException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
+import { ConfigService } from '@nestjs/config';
 import { Repository, DeepPartial } from 'typeorm';
-import { TenantConfig } from './entities/tenant-config.entity';
+import {
+  EnvironmentType,
+  TenantConfig,
+} from './entities/tenant-config.entity';
 import { CreateTenantConfigDto } from './dto/create-tenant-config.dto';
 import { UpdateTenantConfigDto } from './dto/update-tenant-config.dto';
+
+/** Non-secret config surface returned to the parent portal / public pay. */
+export interface PublicTenantConfig {
+  tenantId: string;
+  environmentType: EnvironmentType;
+  configurationName: string;
+  logoUrl: string | null;
+  receiptLogoUrl: string | null;
+  domainUrl: string | null;
+  privacyPolicyUrl: string | null;
+  termsAndConditionsUrl: string | null;
+  refundPolicyUrl: string | null;
+}
 
 @Injectable()
 export class TenantConfigsService {
   constructor(
     @InjectRepository(TenantConfig)
     private readonly repo: Repository<TenantConfig>,
+    private readonly config: ConfigService,
   ) {}
+
+  /**
+   * Reduce a URL / href / Host header to a bare hostname so a configured
+   * `domainUrl` of `https://pay.school.com/` matches a caller value of
+   * `https://pay.school.com/parent/login?x=1` or `pay.school.com:443`.
+   */
+  private normaliseHost(value: string | null | undefined): string {
+    if (!value) return '';
+    return value
+      .trim()
+      .toLowerCase()
+      .replace(/^https?:\/\//, '')
+      .replace(/\/.*$/, '')
+      .replace(/:\d+$/, '');
+  }
+
+  /** Current app environment (from APP_ENV / NODE_ENV) as an EnvironmentType. */
+  private currentEnvironment(): EnvironmentType | null {
+    const raw = (this.config.get<string>('appEnv') ?? '').toLowerCase().trim();
+    const allowed = Object.values(EnvironmentType) as string[];
+    return allowed.includes(raw) ? (raw as EnvironmentType) : null;
+  }
+
+  /**
+   * Resolve the non-secret tenant config for a caller's domain. The client
+   * passes its `window.location.href`; we match its host against
+   * `domain_url`. When several configs share a domain we prefer the one
+   * whose `environment_type` matches the running app env (APP_ENV), so the
+   * production site gets the production config and QA gets QA. Returns null
+   * if nothing matches.
+   */
+  async resolvePublicByUrl(url: string): Promise<PublicTenantConfig | null> {
+    const target = this.normaliseHost(url);
+    if (!target) return null;
+
+    const matches = (await this.repo.find({ where: { isActive: true } })).filter(
+      (cfg) => this.normaliseHost(cfg.domainUrl) === target,
+    );
+    if (!matches.length) return null;
+
+    const env = this.currentEnvironment();
+    const chosen =
+      (env && matches.find((c) => c.environmentType === env)) ?? matches[0];
+
+    return {
+      tenantId: chosen.tenantId,
+      environmentType: chosen.environmentType,
+      configurationName: chosen.configurationName,
+      logoUrl: chosen.logoUrl,
+      receiptLogoUrl: chosen.receiptLogoUrl,
+      domainUrl: chosen.domainUrl,
+      privacyPolicyUrl: chosen.privacyPolicyUrl,
+      termsAndConditionsUrl: chosen.termsAndConditionsUrl,
+      refundPolicyUrl: chosen.refundPolicyUrl,
+    };
+  }
 
   private toEntity(dto: CreateTenantConfigDto | UpdateTenantConfigDto): DeepPartial<TenantConfig> {
     return {
@@ -24,6 +98,9 @@ export class TenantConfigsService {
       logoUrl: dto.logoUrl,
       receiptLogoUrl: dto.receiptLogoUrl,
       domainUrl: dto.domainUrl,
+      privacyPolicyUrl: dto.privacyPolicyUrl,
+      termsAndConditionsUrl: dto.termsAndConditionsUrl,
+      refundPolicyUrl: dto.refundPolicyUrl,
       accessKey: dto.accessKey,
       storageConnectionString: dto.connectionString,
       storageContainerName: dto.containerName,

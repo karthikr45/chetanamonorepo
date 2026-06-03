@@ -34,6 +34,12 @@ function required(name: string, devDefault: string): string {
 
 export default () => ({
   nodeEnv: process.env.NODE_ENV || 'development',
+  // Selects which tenant_configurations.environment_type row is served to
+  // the parent portal / public pay (production | qa | development). Falls
+  // back to the node environment when APP_ENV isn't set.
+  appEnv: (
+    process.env.APP_ENV || (isProd ? 'production' : 'development')
+  ).toLowerCase(),
   port: parseInt(process.env.PORT ?? '3001', 10) || 3001,
   database: {
     host: process.env.DB_HOST || 'localhost',
