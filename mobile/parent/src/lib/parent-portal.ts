@@ -168,6 +168,38 @@ export async function fetchPayments(): Promise<Payment[]> {
   return unwrap<Payment[]>(data);
 }
 
+// ── Cross-tenant payment history (matched by parent email) ──
+export interface PaymentHistoryRow {
+  paymentId: string;
+  tenantId: string;
+  tenantName: string;
+  studentName: string | null;
+  admissionNumber: string | null;
+  academicYear: string | null;
+  term: string | null;
+  amount: string;
+  currency: string;
+  method: string | null;
+  status: string;
+  clearanceStatus: string;
+  receiptNumber: string | null;
+  paidAt: string | null;
+  createdAt: string;
+}
+
+export interface PaymentHistoryResponse {
+  email: string;
+  totalPaid: string;
+  count: number;
+  payments: PaymentHistoryRow[];
+}
+
+/** Payment history for the parent across every school they're registered in. */
+export async function fetchPaymentHistory(): Promise<PaymentHistoryResponse> {
+  const { data } = await api.get("/parent/payments/history");
+  return unwrap<PaymentHistoryResponse>(data);
+}
+
 export interface FeedPost {
   id: string;
   title: string | null;

@@ -143,8 +143,9 @@ export default function DashboardScreen() {
                 <Stat label="Penalty" value={inr(data.summary.totalPenalty)} bg="#f1f5f9" fg="#334155" />
               </View>
             )}
-            <View style={{ flexDirection: "row", gap: 8, marginBottom: 16 }}>
+            <View style={{ flexDirection: "row", gap: 8, marginBottom: 8, flexWrap: "wrap" }}>
               <NavBtn label="Payments" onPress={() => router.push("/payments")} />
+              <NavBtn label="History" onPress={() => router.push("/payment-history")} />
               <NavBtn label="School Feed" onPress={() => router.push("/feed")} />
             </View>
             <Text style={{ fontSize: 16, fontWeight: "700", color: "#1e293b", marginBottom: 8 }}>

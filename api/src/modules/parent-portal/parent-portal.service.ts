@@ -18,6 +18,7 @@ import {
   PaymentType,
 } from '../payments/entities/payment.entity';
 import { ParentStudent } from '../parents/entities/parent-student.entity';
+import { Parent } from '../parents/entities/parent.entity';
 import { Tenant } from '../tenants/entities/tenant.entity';
 import { ParentsService } from '../parents/parents.service';
 import { PaymentsService } from '../payments/payments.service';
@@ -30,6 +31,25 @@ import {
   TENANT_TYPE,
   TenantTypeValue,
 } from '../../common/constants/tenant';
+
+/** One row in the cross-tenant parent payment history. */
+export interface PaymentHistoryRow {
+  paymentId: string;
+  tenantId: string;
+  tenantName: string;
+  studentName: string | null;
+  admissionNumber: string | null;
+  academicYear: string | null;
+  term: string | null;
+  amount: string;
+  currency: string;
+  method: string | null;
+  status: string;
+  clearanceStatus: string;
+  receiptNumber: string | null;
+  paidAt: string | null;
+  createdAt: string;
+}
 
 @Injectable()
 export class ParentPortalService {
@@ -251,6 +271,94 @@ export class ParentPortalService {
       where: { tenantId, feeId: In(fees.map((f) => f.id)) },
       order: { createdAt: 'DESC' },
     });
+  }
+
+  /**
+   * Cross-tenant payment history for a parent, matched by email across
+   * EVERY school the parent is registered in. A parent has one `parents`
+   * row per tenant (unique on tenant+email), so we gather all rows for the
+   * email, then their children → fees → recognised payments in each tenant,
+   * and return one flat list (newest first) tagged with the school name.
+   * Only settled ledger entries (receipt_number set) are included.
+   */
+  async paymentHistoryByEmail(email: string) {
+    const normalized = (email ?? '').trim().toLowerCase();
+    const empty = { email: normalized, totalPaid: '0.00', count: 0, payments: [] as PaymentHistoryRow[] };
+    if (!normalized) return empty;
+
+    const parents = await this.dataSource
+      .getRepository(Parent)
+      .find({ where: { email: normalized, isActive: true } });
+    if (!parents.length) return empty;
+
+    const rows: PaymentHistoryRow[] = [];
+    for (const parent of parents) {
+      const links = await this.linkRepo.find({
+        where: { parentId: parent.id, tenantId: parent.tenantId },
+      });
+      if (!links.length) continue;
+
+      const admissions = [...new Set(links.map((l) => l.admissionNumber))];
+      const students = await this.studentRepo.find({
+        where: { tenantId: parent.tenantId, admissionNumber: In(admissions) },
+      });
+      if (!students.length) continue;
+      const studentById = new Map(students.map((s) => [s.id, s]));
+
+      const fees = await this.feeRepo.find({
+        where: { tenantId: parent.tenantId, studentId: In(students.map((s) => s.id)) },
+      });
+      if (!fees.length) continue;
+      const feeById = new Map(fees.map((f) => [f.id, f]));
+
+      const payments = await this.paymentRepo.find({
+        where: {
+          tenantId: parent.tenantId,
+          feeId: In(fees.map((f) => f.id)),
+          receiptNumber: Not(IsNull()),
+        },
+        order: { paidAt: 'DESC' },
+      });
+      if (!payments.length) continue;
+
+      const tenant = await this.tenantRepo.findOne({ where: { id: parent.tenantId } });
+      const tenantName = tenant?.tenantName ?? tenant?.name ?? 'School';
+
+      for (const p of payments) {
+        const fee = p.feeId ? feeById.get(p.feeId) : undefined;
+        const student = fee ? studentById.get(fee.studentId) : undefined;
+        rows.push({
+          paymentId: p.id,
+          tenantId: parent.tenantId,
+          tenantName,
+          studentName: student?.name ?? null,
+          admissionNumber: student?.admissionNumber ?? null,
+          academicYear: fee?.academicYear ?? null,
+          term: fee?.term ?? null,
+          amount: p.amount,
+          currency: p.currency,
+          method: p.method,
+          status: p.status,
+          clearanceStatus: p.clearanceStatus,
+          receiptNumber: p.receiptNumber,
+          paidAt: p.paidAt ? p.paidAt.toISOString() : null,
+          createdAt: p.createdAt.toISOString(),
+        });
+      }
+    }
+
+    rows.sort((a, b) => {
+      const da = new Date(a.paidAt ?? a.createdAt).getTime();
+      const db = new Date(b.paidAt ?? b.createdAt).getTime();
+      return db - da;
+    });
+
+    const totalPaid = rows
+      .filter((r) => r.clearanceStatus !== ClearanceStatus.BOUNCED)
+      .reduce((s, r) => s + Number(r.amount), 0)
+      .toFixed(2);
+
+    return { email: normalized, totalPaid, count: rows.length, payments: rows };
   }
 
   async dashboard(tenantId: string, parentId: string) {

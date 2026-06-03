@@ -95,6 +95,16 @@ export class ParentPortalController {
     return this.portal.listPayments(user.tenantId, user.userId);
   }
 
+  @Get('payments/history')
+  @ApiOperation({
+    summary:
+      "Cross-tenant payment history for the logged-in parent — matched by " +
+      'email across every school the parent is registered in',
+  })
+  paymentHistory(@CurrentUser() user: any) {
+    return this.portal.paymentHistoryByEmail(user.email);
+  }
+
   @Post('payments')
   @ApiOperation({ summary: 'Initiate an online payment for a fee' })
   initiatePayment(

@@ -328,6 +328,12 @@ export default function DashboardPage() {
               Payments
             </a>
             <a
+              href="/payment-history"
+              className="text-sm font-semibold text-[#6c739c] hover:underline"
+            >
+              History
+            </a>
+            <a
               href="/feed"
               className="text-sm font-semibold text-[#6c739c] hover:underline"
             >
