@@ -66,7 +66,6 @@ export class UploadValidationService {
 
     const existing = await this.feesService.findExistingByKeys(
       tenantId,
-      schoolCode,
       allValuesForExisting.map((r) => ({
         admissionNumber: r.admissionNumber,
         academicYear: r.academicYear,
@@ -159,11 +158,11 @@ export class UploadValidationService {
   }
 
   private feeKey(
-    branch: string,
+    schoolCode: string,
     admission: string,
     year: string,
     term: FeePeriod,
   ): string {
-    return `${branch.toLowerCase()}::${admission}::${year}::${term}`;
+    return `${schoolCode.toLowerCase()}::${admission}::${year}::${term}`;
   }
 }

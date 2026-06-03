@@ -67,9 +67,6 @@ export class FeePayment {
   @Column({ name: 'tenant_id', type: 'uuid' })
   tenantId: string;
 
-  @Column({ type: 'varchar', length: 100 })
-  branch: string;
-
   @ManyToOne(() => Fee, { onDelete: 'RESTRICT', nullable: false })
   @JoinColumn({ name: 'fee_id' })
   fee: Fee;

@@ -12,7 +12,6 @@ declare global {
       email: string;
       role: string;
       tenantId: string | null;
-      branch: string | null;
     }
   }
 }

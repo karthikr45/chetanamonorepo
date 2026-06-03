@@ -17,7 +17,6 @@ export class PenaltyRulesService {
   async create(tenantId: string, dto: CreatePenaltyRuleDto): Promise<PenaltyRule> {
     const row = this.rulesRepo.create({
       tenantId,
-      branch: dto.branch ?? null,
       academicYear: dto.academicYear ?? null,
       term: dto.term ?? null,
       triggerAfterDays: dto.triggerAfterDays,
@@ -49,7 +48,6 @@ export class PenaltyRulesService {
     dto: UpdatePenaltyRuleDto,
   ): Promise<PenaltyRule> {
     const r = await this.findOneOrFail(tenantId, id);
-    if (dto.branch !== undefined) r.branch = dto.branch || null;
     if (dto.academicYear !== undefined) r.academicYear = dto.academicYear || null;
     if (dto.term !== undefined) r.term = dto.term || null;
     if (dto.triggerAfterDays !== undefined) r.triggerAfterDays = dto.triggerAfterDays;

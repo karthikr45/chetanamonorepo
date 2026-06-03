@@ -44,7 +44,6 @@ run('Money paths (e2e, Postgres)', () => {
     const fee = await ds.getRepository(Fee).save(
       ds.getRepository(Fee).create({
         tenantId,
-        branch: BRANCH,
         academicYear: AY,
         studentId,
         term: TermType.FIRST,

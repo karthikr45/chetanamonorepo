@@ -39,7 +39,7 @@ export class CreateStudentTermDto {
 export class CreateStudentDto {
   @ApiPropertyOptional({
     description:
-      'School code this student belongs to. Defaults to the tenant admin\'s JWT branch.',
+      'School code this student belongs to. Required in the body when creating a single student.',
     pattern: SCHOOL_CODE_REGEX.source,
     example: 'SVBK-BRD',
   })

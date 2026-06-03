@@ -8,8 +8,8 @@ schema below is created automatically on first boot. For production set
 
 Every row that belongs to a school carries `tenant_id`. Every service
 filters by `tenant_id` from the JWT, so tenants can never see each
-other's data. Some entities also carry a `branch` column for further
-intra-tenant scoping.
+other's data. The `students` table additionally carries a `school_code`
+identifying the institution (shared across sibling tenants).
 
 ## Tables involved in the Students + Fees flow
 
@@ -26,7 +26,7 @@ intra-tenant scoping.
                   │  (per tenant)    │    │ (super/tenant)  │
                   └──────────────────┘    └─────────────────┘
                                 │
-                                │ 1..N (tenant_id, branch, year, admission)
+                                │ 1..N (tenant_id, school_code, year, admission)
                                 ▼
                          ┌─────────────┐
                          │   students  │  one row per academic year
@@ -61,7 +61,7 @@ intra-tenant scoping.
 
 ## `students`
 
-One row per **(tenant, branch, admission_number, academic_year)**. So a
+One row per **(tenant, school_code, admission_number, academic_year)**. So a
 student promoted from class 7 to class 8 will have **two rows** — one
 per year. The admission number is the canonical identity that doesn't
 change yearly.
@@ -70,7 +70,7 @@ change yearly.
 students
 ├── id                  uuid PK
 ├── tenant_id           uuid                       NOT NULL
-├── branch              varchar(100)               NOT NULL
+├── school_code         varchar(100)               NOT NULL
 ├── admission_number    varchar(50)                NOT NULL
 ├── academic_year       varchar(20)                NOT NULL   -- "2025-2026"
 ├── name                varchar(150)               NOT NULL
@@ -83,9 +83,9 @@ students
 ├── created_at          timestamptz                default now()
 └── updated_at          timestamptz                default now()
 
-UNIQUE (tenant_id, branch, admission_number, academic_year)
+UNIQUE (tenant_id, school_code, admission_number, academic_year)
        └─ uq_students_tenant_branch_admission_year
-INDEX  (tenant_id, branch, academic_year)
+INDEX  (tenant_id, school_code, academic_year)
        └─ idx_students_tenant_branch_year
 ```
 
@@ -96,14 +96,13 @@ separate `student_enrolments` table.
 
 ## `fees` (the term-fee bill)
 
-One row per **(tenant, branch, student_id, academic_year, term)**.
+One row per **(tenant, student_id, academic_year, term)**.
 With 5 terms supported, one student in one year has up to 5 rows here.
 
 ```sql
 fees
 ├── id                  uuid PK
 ├── tenant_id           uuid                       NOT NULL
-├── branch              varchar(100)               NOT NULL
 ├── academic_year       varchar(20)                NOT NULL
 ├── student_id          uuid                       NOT NULL FK → students.id
 ├── term                ENUM(                       NOT NULL
@@ -121,10 +120,10 @@ fees
 ├── created_at          timestamptz                default now()
 └── updated_at          timestamptz                default now()
 
-UNIQUE (tenant_id, branch, student_id, academic_year, term)
-       └─ uq_fees_tenant_branch_student_year_term
-INDEX  (tenant_id, branch, academic_year)
-       └─ idx_fees_tenant_branch_year
+UNIQUE (tenant_id, student_id, academic_year, term)
+       └─ uq_fees_tenant_student_year_term
+INDEX  (tenant_id, academic_year)
+       └─ idx_fees_tenant_year
 INDEX  (tenant_id, payment_status)
        └─ idx_fees_tenant_status
 CHECK  original_amount  >= 0
@@ -150,7 +149,6 @@ payments are recorded by admin staff.
 fee_payments
 ├── id                  uuid PK
 ├── tenant_id           uuid                       NOT NULL
-├── branch              varchar(100)               NOT NULL
 ├── fee_id              uuid                       NOT NULL FK → fees.id
 ├── amount              decimal(12,2)              NOT NULL  CHECK > 0
 ├── payment_type        ENUM(                       NOT NULL
@@ -236,15 +234,14 @@ parent_students  (link table)
 ├── id                  uuid PK
 ├── parent_id           uuid                       NOT NULL FK → parents.id (cascade on delete)
 ├── tenant_id           uuid                       NOT NULL
-├── branch              varchar(100)               NOT NULL
 ├── admission_number    varchar(50)                NOT NULL
 ├── relationship        ENUM('father','mother','guardian')  default 'guardian'
 ├── is_primary          boolean                    default false
 └── created_at          timestamptz
 
-UNIQUE (parent_id, tenant_id, branch, admission_number)
+UNIQUE (parent_id, tenant_id, admission_number)
        └─ uq_parent_students_link
-INDEX  (tenant_id, branch, admission_number)
+INDEX  (tenant_id, admission_number)
        └─ idx_parent_students_lookup
 ```
 
@@ -273,7 +270,7 @@ Brief — these are the tables every other entity scopes by:
 - `tenants` — one row per school. `tenantCode` (unique), `tenantName`, `medium`, `boardType`, address fields, `clientId`/`secretKey`, `isActive`.
 - `tenant_configs` — per-(tenant, env) credentials: storage (S3/etc.), payment gateway keys, SMTP. Secrets live here, not in env files.
 - `academic_years` — per-tenant. `(academic_year, isCurrentYear, isActive, tenantId)`. Unique on `academic_year`.
-- `admins` — both super-admins and per-tenant admins. `role enum(super_admin, admin, parent)`, `tenantId` (null for super), `branch`, `passwordHash`, `refreshTokenHash`.
+- `admins` — both super-admins and per-tenant admins. `role enum(super_admin, admin, parent)`, `tenantId` (null for super), `passwordHash`, `refreshTokenHash`.
 - `users` — placeholder for non-admin user types (currently lightly used).
 
 ## What changed for the 5-term + discount upload

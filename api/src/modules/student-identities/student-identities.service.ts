@@ -16,7 +16,7 @@ export interface IdentityMatch {
     id: string;
     admissionNumber: string;
     academicYear: string;
-    branch: string;
+    schoolCode: string;
     class: string;
     section: string;
     rollNo: string;
@@ -132,7 +132,7 @@ export class StudentIdentitiesService implements OnApplicationBootstrap {
       studentId: string;
       admissionNumber: string;
       academicYear: string;
-      branch: string;
+      schoolCode: string;
       tcIssuedAt: Date | null;
       totalOutstanding: string;
       unpaidFees: Array<{ feeId: string; term: string; remaining: string }>;
@@ -182,7 +182,7 @@ export class StudentIdentitiesService implements OnApplicationBootstrap {
         studentId: s.id,
         admissionNumber: s.admissionNumber,
         academicYear: s.academicYear,
-        branch: s.schoolCode,
+        schoolCode: s.schoolCode,
         tcIssuedAt: s.tcIssuedAt,
         totalOutstanding: rowTotal.toFixed(2),
         unpaidFees,
@@ -329,7 +329,7 @@ export class StudentIdentitiesService implements OnApplicationBootstrap {
           id: s.id,
           admissionNumber: s.admissionNumber,
           academicYear: s.academicYear,
-          branch: s.schoolCode,
+          schoolCode: s.schoolCode,
           class: s.class,
           section: s.section,
           rollNo: s.rollNo,

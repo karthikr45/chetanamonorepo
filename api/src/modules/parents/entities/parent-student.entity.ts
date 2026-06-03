@@ -21,18 +21,16 @@ export enum Relationship {
  * Links a Parent to one of their children by admission_number (the
  * canonical student identity that doesn't change year-over-year).
  * The actual current-year Student row is resolved via
- * (tenant_id, branch, admission_number, current academic_year).
+ * (tenant_id, admission_number, current academic_year).
  */
 @Entity('parent_students')
 @Unique('uq_parent_students_link', [
   'parentId',
   'tenantId',
-  'branch',
   'admissionNumber',
 ])
 @Index('idx_parent_students_lookup', [
   'tenantId',
-  'branch',
   'admissionNumber',
 ])
 export class ParentStudent {
@@ -48,9 +46,6 @@ export class ParentStudent {
 
   @Column({ name: 'tenant_id', type: 'uuid' })
   tenantId: string;
-
-  @Column({ type: 'varchar', length: 100 })
-  branch: string;
 
   @Column({ name: 'admission_number', type: 'varchar', length: 50 })
   admissionNumber: string;

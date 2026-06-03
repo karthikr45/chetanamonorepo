@@ -42,7 +42,6 @@ const SUPER_ADMIN = {
   password: 'Admin@123',
   firstName: 'Super',
   lastName: 'Admin',
-  branch: 'HYD',
 };
 const DEMO_TENANT = {
   tenantCode: 'SVBK_HYD',
@@ -61,7 +60,6 @@ const TENANT_ADMIN = {
   password: 'Admin@123',
   firstName: 'School',
   lastName: 'Admin',
-  branch: 'Main',
 };
 const ACADEMIC_YEAR = '2025-2026';
 const DEMO_STUDENT = {
@@ -172,7 +170,6 @@ async function ensureSuperAdmin(repo: Repository<Admin>): Promise<Admin> {
       lastName: SUPER_ADMIN.lastName,
       email: SUPER_ADMIN.email,
       role: Role.SUPER_ADMIN,
-      branch: SUPER_ADMIN.branch,
       clientId: `client_${randomBytes(8).toString('hex')}`,
       secretKey: randomBytes(32).toString('hex'),
       passwordHash,
@@ -220,7 +217,6 @@ async function ensureTenantAdmin(
       lastName: TENANT_ADMIN.lastName,
       email: TENANT_ADMIN.email,
       role: Role.ADMIN,
-      branch: TENANT_ADMIN.branch,
       tenantId,
       clientId: `client_${randomBytes(8).toString('hex')}`,
       secretKey: randomBytes(32).toString('hex'),
@@ -292,7 +288,6 @@ async function ensureFees(
       .findOne({
         where: {
           tenantId: student.tenantId,
-          branch: student.schoolCode,
           studentId: student.id,
           academicYear: student.academicYear,
           term,
@@ -306,7 +301,6 @@ async function ensureFees(
     await repo.save(
       repo.create({
         tenantId: student.tenantId,
-        branch: student.schoolCode,
         academicYear: student.academicYear,
         studentId: student.id,
         term,
@@ -351,7 +345,6 @@ async function ensureParent(
       where: {
         parentId: parent.id,
         tenantId,
-        branch: DEMO_STUDENT.schoolCode,
         admissionNumber: DEMO_STUDENT.admissionNumber,
       },
     })
@@ -362,7 +355,6 @@ async function ensureParent(
       linksRepo.create({
         parentId: parent.id,
         tenantId,
-        branch: DEMO_STUDENT.schoolCode,
         admissionNumber: DEMO_STUDENT.admissionNumber,
         relationship: Relationship.FATHER,
         isPrimary: true,

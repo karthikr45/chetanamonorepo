@@ -37,9 +37,6 @@ export class Admin {
   @Column({ type: 'varchar', length: 50 })
   role: string;
 
-  @Column({ nullable: true })
-  branch: string;
-
   @Column({ unique: true })
   clientId: string;
 

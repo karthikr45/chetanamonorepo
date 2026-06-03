@@ -11,7 +11,7 @@ const ACADEMIC_YEAR_REGEX = /^\d{4}-\d{4}$/;
  * wants to see the full picture for a given year, so we also expose a
  * second endpoint keyed by admission number. See the controller.
  *
- * Note: tenant and branch come from the JWT — no client-supplied scope.
+ * Note: tenant comes from the JWT — no client-supplied scope.
  */
 export class AcademicYearQueryDto {
   @ApiProperty({ example: '2026-2027', description: 'Academic year in YYYY-YYYY format' })

@@ -43,7 +43,6 @@ export class TenantAdminsService {
       lastName: dto.lastName,
       email: dto.email,
       role: dto.role,
-      branch: dto.branch,
       tenantId,
       password: dto.password,
     });

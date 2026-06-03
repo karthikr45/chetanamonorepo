@@ -88,12 +88,10 @@ export class StudentsController {
       'Creates one Student row for (tenant, schoolCode, admissionNumber, academicYear) and optionally a Fee row per term passed in the body.',
   })
   async createOne(@Body() dto: CreateStudentDto, @Req() req: Request) {
-    const { tenantId, branch: jwtBranch } = ctxWithBranch(req);
-    const schoolCode = (dto.schoolCode ?? jwtBranch ?? '').trim();
+    const { tenantId } = ctx(req);
+    const schoolCode = (dto.schoolCode ?? '').trim();
     if (!schoolCode) {
-      throw new BadRequestException(
-        'schoolCode is required (either in the body or on your JWT)',
-      );
+      throw new BadRequestException('schoolCode is required in the body');
     }
     return this.uploadService.createOne(tenantId, schoolCode, dto);
   }
@@ -207,7 +205,7 @@ export class StudentsController {
   @ApiOperation({
     summary: 'Validate Excel upload',
     description:
-      'Parses the uploaded .xlsx/.csv and validates every row. No DB writes. Branch is taken from the JWT.',
+      'Parses the uploaded .xlsx/.csv and validates every row. No DB writes.',
   })
   @ApiConsumes('multipart/form-data')
   @ApiBody({
@@ -228,8 +226,8 @@ export class StudentsController {
     @UploadedFile(buildFilePipe()) file: Express.Multer.File,
     @Req() req: Request,
   ): Promise<ValidateUploadResponseDto> {
-    const { tenantId, branch } = ctxWithBranch(req);
-    return this.uploadService.validateFile(file.buffer, tenantId, branch);
+    const { tenantId } = ctx(req);
+    return this.uploadService.validateFile(file.buffer, tenantId);
   }
 
   @Post('upload/confirm')
@@ -237,7 +235,7 @@ export class StudentsController {
   @ApiOperation({
     summary: 'Confirm and save Excel upload',
     description:
-      'Re-validates the file server-side and persists atomically. Branch is taken from the JWT.',
+      'Re-validates the file server-side and persists atomically.',
   })
   @ApiConsumes('multipart/form-data')
   @ApiBody({
@@ -258,8 +256,8 @@ export class StudentsController {
     @UploadedFile(buildFilePipe()) file: Express.Multer.File,
     @Req() req: Request,
   ): Promise<ConfirmUploadResponseDto> {
-    const { tenantId, branch } = ctxWithBranch(req);
-    return this.uploadService.confirmUpload(file.buffer, tenantId, branch);
+    const { tenantId } = ctx(req);
+    return this.uploadService.confirmUpload(file.buffer, tenantId);
   }
 
   // ─────────────── Student read / edit ───────────────
@@ -276,7 +274,7 @@ export class StudentsController {
   ) {
     const { tenantId } = ctx(req);
     // Students are scoped by the tenant's code (student.schoolCode holds the
-    // tenant's tenantCode), not by the admin's free-text JWT branch label.
+    // tenant's tenantCode).
     const tenant = await this.tenantRepo.findOne({ where: { id: tenantId } });
     const result = await this.studentsService.list(tenantId, {
       ...query,
@@ -302,15 +300,15 @@ export class StudentsController {
   @Get('by-admission/with-fees')
   @ApiOperation({
     summary: 'Get student + fees by admission number',
-    description: 'Branch is taken from the JWT.',
+    description: 'Students are scoped by the tenant code.',
   })
   async getByAdmissionWithFees(
     @Query() query: StudentByAdmissionQueryDto,
     @Req() req: Request,
   ) {
-    const { tenantId } = ctxWithBranch(req);
+    const { tenantId } = ctx(req);
     // Students are scoped by the tenant's code (student.schoolCode holds the
-    // tenant's tenantCode), not by the admin's free-text JWT branch label.
+    // tenant's tenantCode).
     const tenant = await this.tenantRepo.findOne({ where: { id: tenantId } });
     const student = await this.studentsService.findByAdmissionYear(
       tenantId,
@@ -603,7 +601,6 @@ function mapPaymentType(input: unknown): PaymentType {
 interface AuthContext {
   tenantId: string;
   userId: string;
-  branch: string | null;
 }
 
 function ctx(req: Request): AuthContext {
@@ -614,19 +611,7 @@ function ctx(req: Request): AuthContext {
   return {
     tenantId: user.tenantId,
     userId: user.userId,
-    branch: user.branch ?? null,
   };
-}
-
-/** Variant that requires the user's JWT to carry a branch. Throws 403 otherwise. */
-function ctxWithBranch(req: Request): AuthContext & { branch: string } {
-  const c = ctx(req);
-  if (!c.branch) {
-    throw new ForbiddenException(
-      'Your account is not scoped to a branch — this endpoint requires a branch-scoped token.',
-    );
-  }
-  return { ...c, branch: c.branch };
 }
 
 function buildUuidPipe(paramName: string) {

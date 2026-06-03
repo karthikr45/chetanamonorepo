@@ -50,7 +50,6 @@ export class ParentsService implements OnApplicationBootstrap {
         manager.getRepository(ParentStudent).create({
           parentId: saved.id,
           tenantId,
-          branch: s.branch,
           admissionNumber: s.admissionNumber,
           relationship: s.relationship,
           isPrimary: s.isPrimary ?? false,
@@ -128,7 +127,6 @@ export class ParentsService implements OnApplicationBootstrap {
       where: {
         parentId,
         tenantId,
-        branch: dto.branch,
         admissionNumber: dto.admissionNumber,
       },
     });
@@ -140,7 +138,6 @@ export class ParentsService implements OnApplicationBootstrap {
     const link = this.linkRepo.create({
       parentId,
       tenantId,
-      branch: dto.branch,
       admissionNumber: dto.admissionNumber,
       relationship: dto.relationship,
       isPrimary: dto.isPrimary ?? false,
@@ -187,7 +184,6 @@ export class ParentsService implements OnApplicationBootstrap {
       email: string | null | undefined;
       name?: string | null;
       phoneNumber?: string | null;
-      branch: string;
       admissionNumber: string;
       relationship?: Relationship;
     },
@@ -223,7 +219,6 @@ export class ParentsService implements OnApplicationBootstrap {
         where: {
           parentId: parent.id,
           tenantId,
-          branch: args.branch,
           admissionNumber: args.admissionNumber,
         },
       });
@@ -235,7 +230,6 @@ export class ParentsService implements OnApplicationBootstrap {
           linkRepo.create({
             parentId: parent.id,
             tenantId,
-            branch: args.branch,
             admissionNumber: args.admissionNumber,
             relationship: args.relationship ?? Relationship.GUARDIAN,
             isPrimary: !anyPrimary,
@@ -277,7 +271,6 @@ export class ParentsService implements OnApplicationBootstrap {
           email: s.email,
           name: s.name,
           phoneNumber: s.phoneNumber,
-          branch: s.schoolCode,
           admissionNumber: s.admissionNumber,
         });
         if (p) parentsTouched++;

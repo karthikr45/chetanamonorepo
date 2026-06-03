@@ -14,12 +14,6 @@ import { TermType } from '../../fees/entities/fee.entity';
 import { PenaltyAmountType } from '../entities/penalty-rule.entity';
 
 export class CreatePenaltyRuleDto {
-  @ApiPropertyOptional({ description: 'Limit to one branch (omit to apply to all)' })
-  @IsOptional()
-  @IsString()
-  @Length(1, 100)
-  branch?: string;
-
   @ApiPropertyOptional({ example: '2025-2026' })
   @IsOptional()
   @IsString()

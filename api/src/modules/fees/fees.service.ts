@@ -224,7 +224,6 @@ export class FeesService {
 
   async findExistingByKeys(
     tenantId: string,
-    branch: string,
     keys: { admissionNumber: string; academicYear: string }[],
   ): Promise<ExistingFeeRecord[]> {
     if (!keys.length) return [];
@@ -239,7 +238,6 @@ export class FeesService {
       .addSelect('fee.academicYear', 'academicYear')
       .addSelect('student.admissionNumber', 'admissionNumber')
       .where('fee.tenantId = :tenantId', { tenantId })
-      .andWhere('fee.branch = :branch', { branch })
       .andWhere('fee.academicYear IN (:...years)', { years })
       .andWhere('student.admissionNumber IN (:...admissions)', { admissions })
       .getRawMany<ExistingFeeRecord>();
@@ -257,7 +255,6 @@ export class FeesService {
       const net = Math.max(0, input.originalAmount - discount);
       return repo.create({
         tenantId: input.tenantId,
-        branch: input.branch,
         academicYear: input.academicYear,
         studentId: input.studentId,
         term: input.term,
@@ -283,7 +280,7 @@ export class FeesService {
   // ──────────────── Penalty / discount ────────────────
 
  /**
- * Adds `amount` penalty to fees in (branch, academicYear, term). Two modes:
+ * Adds `amount` penalty to fees in (academicYear, term). Two modes:
  *  - applyToAll=true: every non-PAID fee in scope.
  *  - applyToAll=false: only fees of listed students.
  *
@@ -295,7 +292,6 @@ export class FeesService {
 async addPenaltyForStudents(
   tenantId: string,
   input: {
-    branch: string;
     academicYear: string;
     term: TermType;
     applyToAll?: boolean;
@@ -324,7 +320,6 @@ async addPenaltyForStudents(
       .innerJoin('fee.student', 'student')
       .setLock('pessimistic_write')
       .where('fee.tenantId = :tenantId', { tenantId })
-      .andWhere('fee.branch = :branch', { branch: input.branch })
       .andWhere('fee.academicYear = :year', { year: input.academicYear })
       .andWhere('fee.term = :term', { term: input.term });
 
@@ -367,7 +362,7 @@ async addPenaltyForStudents(
 
     this.logger.log(
       `Penalty +${input.amount} applied to ${affected} fees, skipped ${skipped} ` +
-        `(branch=${input.branch}, year=${input.academicYear}, term=${input.term}, ` +
+        `(year=${input.academicYear}, term=${input.term}, ` +
         `applyToAll=${!!input.applyToAll})${
           input.reason ? `; reason: ${input.reason}` : ''
         }`,
@@ -382,7 +377,7 @@ async addPenaltyForStudents(
 }
 
 /**
- * Waives the entire current penalty on fees in (branch, academicYear, term).
+ * Waives the entire current penalty on fees in (academicYear, term).
  *  - applyToAll=true: every non-PAID fee with penalty > 0.
  *  - applyToAll=false: only fees of listed students.
  *
@@ -391,7 +386,6 @@ async addPenaltyForStudents(
 async waivePenaltyForStudents(
   tenantId: string,
   input: {
-    branch: string;
     academicYear: string;
     term: TermType;
     applyToAll?: boolean;
@@ -419,7 +413,6 @@ async waivePenaltyForStudents(
       .innerJoin('fee.student', 'student')
       .setLock('pessimistic_write')
       .where('fee.tenantId = :tenantId', { tenantId })
-      .andWhere('fee.branch = :branch', { branch: input.branch })
       .andWhere('fee.academicYear = :year', { year: input.academicYear })
       .andWhere('fee.term = :term', { term: input.term });
 
@@ -468,7 +461,7 @@ async waivePenaltyForStudents(
 
     this.logger.log(
       `Penalty waiver removed ₹${totalWaived.toFixed(2)} from ${affected} fees, ` +
-        `skipped ${skipped} (branch=${input.branch}, year=${input.academicYear}, ` +
+        `skipped ${skipped} (year=${input.academicYear}, ` +
         `term=${input.term}, applyToAll=${!!input.applyToAll})${
           input.reason ? `; reason: ${input.reason}` : ''
         }`,
@@ -483,7 +476,7 @@ async waivePenaltyForStudents(
 }
 
   /**
-   * Bulk discount across fees in (branch, academicYear, term). Same
+   * Bulk discount across fees in (academicYear, term). Same
    * scope semantics as addPenaltyForStudents. Per-fee, the discount is
    * skipped if it would push net below what has already been paid (we
    * never silently invalidate a posted payment).
@@ -491,7 +484,6 @@ async waivePenaltyForStudents(
   async addDiscountForStudents(
     tenantId: string,
     input: {
-      branch: string;
       academicYear: string;
       term: TermType;
       applyToAll?: boolean;
@@ -520,7 +512,6 @@ async waivePenaltyForStudents(
         .innerJoin('fee.student', 'student')
         .setLock('pessimistic_write')
         .where('fee.tenantId = :tenantId', { tenantId })
-        .andWhere('fee.branch = :branch', { branch: input.branch })
         .andWhere('fee.academicYear = :year', { year: input.academicYear })
         .andWhere('fee.term = :term', { term: input.term });
 
@@ -570,7 +561,7 @@ async waivePenaltyForStudents(
 
       this.logger.log(
         `Discount +${input.amount} applied to ${affected} fees, skipped ${skipped} ` +
-          `(branch=${input.branch}, year=${input.academicYear}, term=${input.term}, ` +
+          `(year=${input.academicYear}, term=${input.term}, ` +
           `applyToAll=${!!input.applyToAll})${
             input.reason ? `; reason: ${input.reason}` : ''
           }`,
@@ -592,7 +583,6 @@ async waivePenaltyForStudents(
   async waiveDiscountForStudents(
     tenantId: string,
     input: {
-      branch: string;
       academicYear: string;
       term: TermType;
       applyToAll?: boolean;
@@ -619,7 +609,6 @@ async waivePenaltyForStudents(
         .innerJoin('fee.student', 'student')
         .setLock('pessimistic_write')
         .where('fee.tenantId = :tenantId', { tenantId })
-        .andWhere('fee.branch = :branch', { branch: input.branch })
         .andWhere('fee.academicYear = :year', { year: input.academicYear })
         .andWhere('fee.term = :term', { term: input.term });
 
@@ -675,7 +664,7 @@ async waivePenaltyForStudents(
 
       this.logger.log(
         `Discount waiver removed ₹${totalWaived.toFixed(2)} from ${affected} fees, ` +
-          `skipped ${skipped} (branch=${input.branch}, year=${input.academicYear}, ` +
+          `skipped ${skipped} (year=${input.academicYear}, ` +
           `term=${input.term}, applyToAll=${!!input.applyToAll})${
             input.reason ? `; reason: ${input.reason}` : ''
           }`,
@@ -970,7 +959,6 @@ async waivePenaltyForStudents(
 
       const payment = manager.getRepository(FeePayment).create({
         tenantId,
-        branch: fee.branch,
         feeId,
         amount: input.amount.toFixed(2),
         paymentType: input.paymentType,

@@ -14,8 +14,8 @@ import { ApiPropertyOptional } from '@nestjs/swagger';
 const ACADEMIC_YEAR_REGEX = /^\d{4}-\d{4}$/;
 
 /**
- * Filters for `GET /students`. Branch is NOT accepted here — it is taken
- * from the JWT so clients can't query across branches.
+ * Filters for `GET /students`. Scope is taken from the JWT (tenant)
+ * so clients can't widen it.
  */
 export class ListStudentsQueryDto {
   @ApiPropertyOptional({ example: '2026-2027' })

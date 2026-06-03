@@ -18,7 +18,6 @@ export interface TenantChoice {
   tenantId: string | null;
   tenantName: string | null;
   role: string;
-  branch: string | null;
 }
 
 export interface SignInDirectResult {
@@ -29,7 +28,6 @@ export interface SignInDirectResult {
     role: string;
     tenantId: string | null;
     tenantName: string | null;
-    branch: string | null;
   };
   accessToken: string;
   refreshToken: string;
@@ -322,7 +320,6 @@ export class AuthService {
         tenantId: a.tenantId ?? null,
         tenantName,
         role: a.role,
-        branch: a.branch ?? null,
       });
     }
 
@@ -381,7 +378,6 @@ export class AuthService {
       email: user.email,
       role: user.role,
       tenantId: user.tenantId ?? null,
-      branch: user.branch ?? null,
     };
     const accessToken = this.jwtService.sign(payload);
     const refreshToken = this.jwtService.sign(payload, {
@@ -399,7 +395,6 @@ export class AuthService {
         role: user.role,
         tenantId: user.tenantId ?? null,
         tenantName,
-        branch: user.branch ?? null,
       },
       accessToken,
       refreshToken,
@@ -455,7 +450,6 @@ export class AuthService {
       email: payload.email,
       role: payload.role,
       tenantId: payload.tenantId,
-      branch: payload.branch,
     };
 
     const newAccessToken = this.jwtService.sign(newPayload);

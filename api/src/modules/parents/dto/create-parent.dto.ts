@@ -15,11 +15,6 @@ import { Type } from 'class-transformer';
 import { Relationship } from '../entities/parent-student.entity';
 
 export class ParentStudentLinkDto {
-  @ApiProperty({ example: 'Main Branch' })
-  @IsString()
-  @IsNotEmpty()
-  branch: string;
-
   @ApiProperty({ example: 'ADM-2024-001' })
   @IsString()
   @IsNotEmpty()

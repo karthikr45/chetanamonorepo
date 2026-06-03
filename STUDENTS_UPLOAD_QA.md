@@ -10,7 +10,7 @@ never overwrite a row.
 
 | Case | Expected | Notes |
 |---|---|---|
-| Row missing `Branch`, `Academic Year`, `ADMISSION`, `NAME`, `e-mail`, `Phone number`, `Class`, `Section` or `Roll No` | Row rejected with `<field>: required` | All identity fields are required |
+| Row missing `Academic Year`, `ADMISSION`, `NAME`, `e-mail`, `Phone number`, `Class`, `Section` or `Roll No` | Row rejected with `<field>: required` | All identity fields are required |
 | `e-mail` not a valid email | `e-mail: invalid format` | |
 | `Phone number` not 7–15 digits with optional leading `+` | `Phone number: must be 7–15 digits, optional leading +` | |
 | `Academic Year` not in `YYYY-YYYY` format | `Academic Year: must be in YYYY-YYYY format` | |
@@ -24,21 +24,18 @@ never overwrite a row.
 | Row has all 5 terms populated | ✅ Inserts five Fee records | |
 | One row mixes valid + invalid term values | Whole row rejected | Atomic: either the row commits or none of it does |
 
-### Branch authorisation
+### School-code scoping
 
 | Case | Expected |
 |---|---|
-| Tenant admin's JWT branch = `Main`. Excel row has `Branch = Main` | ✅ accepted |
-| Tenant admin's JWT branch = `Main`. Excel row has `Branch = Guntur` | ❌ `Branch: branch "Guntur" not allowed; you can only upload for "Main"` |
-| Tenant admin's JWT branch = `Main`. Excel mixes `Main` and `Guntur` rows | Main rows accepted, Guntur rows rejected with the message above |
-| Super-admin (no branch on JWT) uploads any branches | ✅ each row processed under its own branch |
+| Any upload | All rows are stored under the tenant's own `school_code` (the tenant's `tenantCode`) |
+| Excel `Code` column value differs from the tenant code | Ignored — the value is overridden with the tenant's code |
 
 ### Duplicate prevention (the core insert-only contract)
 
 | Case | Expected |
 |---|---|
 | Excel row 5 and row 12 have the **same admission, year, term** | Both rejected: `Duplicate within file: Nth Term Fee for admission … (year) appears more than once — keep only one row per term` |
-| Same admission/year/term across **two rows of different branches** in one Excel | Both accepted (branch is part of the dedup key) |
 | Excel adds Term 1 for admission `ADM-001 / 2025-2026` that **already has a Term 1 in DB** | ❌ `1st Term Fee already exists for admission ADM-001 (2025-2026). Excel is insert-only — to change an existing fee, edit it from the Students table.` |
 | Excel adds Term 2 for admission `ADM-001 / 2025-2026` where only Term 1 exists in DB | ✅ accepted (different term) |
 | Excel re-uploads a previously-uploaded row | ❌ blocked by the same "already exists" check |
@@ -71,14 +68,14 @@ never overwrite a row.
 | Unauthenticated download of `/students/upload/template` | 401 |
 | Tenant admin downloads template | Excel includes 5 sample rows + Instructions sheet |
 | Super-admin uploads to a tenant they don't admin | Blocked at JWT level; `tenantId` is read from token |
-| Two tenants happen to use the same admission number | Each lives in their own tenant; uniqueness is `(tenant_id, branch, admission_number, academic_year)` |
+| Two tenants happen to use the same admission number | Each lives in their own tenant; uniqueness is `(tenant_id, school_code, admission_number, academic_year)` |
 
 ## What the admin sees in the UI
 
 After clicking **Upload Excel**:
 
-1. The file is sent to `POST /api/students/upload/validate` with the
-   JWT branch in headers.
+1. The file is sent to `POST /api/students/upload/validate`; scope is
+   taken from the JWT (`tenantId`).
 2. The response shows total / valid / error counts. Each errored row
    carries a human-readable message (see tables above).
 3. If everything is valid (or the admin chooses to skip the bad rows),

@@ -24,8 +24,8 @@ export enum PenaltyAmountType {
  *     triggerAfterDays=30, maxAmount=null
  *
  * Scope:
- *   - branch null  → applies to every branch on the tenant
  *   - term null    → applies to every term
+ *   - year null    → applies to every academic year
  *   - both null    → applies to every fee in the tenant
  */
 @Entity('penalty_rules')
@@ -36,9 +36,6 @@ export class PenaltyRule {
 
   @Column({ name: 'tenant_id', type: 'uuid' })
   tenantId: string;
-
-  @Column({ type: 'varchar', length: 100, nullable: true })
-  branch: string | null;
 
   @Column({ name: 'academic_year', type: 'varchar', length: 20, nullable: true })
   academicYear: string | null;

@@ -33,11 +33,6 @@ export class CreateTenantAdminDto {
   @IsNotEmpty()
   role: string;
 
-  @ApiPropertyOptional({ example: 'Main Branch' })
-  @IsString()
-  @IsOptional()
-  branch?: string;
-
   @ApiPropertyOptional({
     example: 'Welcome@123',
     description:

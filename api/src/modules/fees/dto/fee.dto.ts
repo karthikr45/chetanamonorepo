@@ -36,7 +36,6 @@ const ONLINE_PAYMENT_TYPES: PaymentType[] = [
 /** Used internally by the upload flow. */
 export interface CreateFeeInput {
   tenantId: string;
-  branch: string;
   academicYear: string;
   studentId: string;
   term: FeePeriod;
@@ -56,10 +55,10 @@ export interface ExistingFeeRecord {
  * POST /fees/penalty/add
  *
  * Two modes:
- *  - applyToAll=true  → apply to every non-PAID fee in (branch, year, term)
+ *  - applyToAll=true  → apply to every non-PAID fee in (year, term)
  *  - applyToAll=false → apply only to fees of the listed students (max 500)
  *
- * Branch and tenant are read from the JWT in the controller — not in the body.
+ * Tenant is read from the JWT in the controller — not in the body.
  */
 export class AddPenaltyDto {
   @ApiProperty({ example: '2026-2027' })
@@ -287,7 +286,7 @@ export class WaiveSingleDto {
 
 /**
  * POST /fees/discount/add
- * Bulk discount across a branch + academic year + term. Mirrors
+ * Bulk discount across an academic year + term. Mirrors
  * AddPenaltyDto: applies to listed students, or all non-PAID fees in
  * scope when applyToAll is true.
  */

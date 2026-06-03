@@ -41,7 +41,7 @@ Monorepo for the SVBK school fee management platform.
 | Tenant admin | password (`POST /api/auth/signin`) | per-tenant CRUD: students, fees, payments, parents, announcements, … |
 | Parent | OTP (`POST /api/parent/auth/send-otp` → `/verify-otp`) | `/api/parent/{me,students,dashboard,fees,payments}` |
 
-All entities carry `tenant_id`; JWT payload includes `role` + `tenantId`; services filter by it. Parents are linked to children by **admission number** (canonical, doesn't change yearly); the current-year `Student` row is resolved via `(tenantId, branch, admissionNumber, currentAcademicYear)`.
+All entities carry `tenant_id`; JWT payload includes `role` + `tenantId`; services filter by it. Parents are linked to children by **admission number** (canonical, doesn't change yearly); the current-year `Student` row is resolved via `(tenantId, admissionNumber, currentAcademicYear)`.
 
 See `api/.env.example` for required env vars.
 

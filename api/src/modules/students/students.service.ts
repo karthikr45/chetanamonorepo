@@ -84,12 +84,19 @@ export class StudentsService {
    */
   async findByAdmissionYear(
     tenantId: string,
-    branch: string,
+    schoolCode: string,
     admissionNumber: string,
     academicYear: string,
   ): Promise<Student> {
     const student = await this.studentRepo.findOne({
-      where: { tenantId, schoolCode: branch, admissionNumber, academicYear },
+      where: {
+        tenantId,
+        // schoolCode is optional scoping — when blank, match on
+        // (tenant, admission, year) alone.
+        ...(schoolCode ? { schoolCode } : {}),
+        admissionNumber,
+        academicYear,
+      },
     });
     if (!student) {
       throw new NotFoundException(
@@ -126,7 +133,6 @@ export class StudentsService {
         email: saved.email,
         name: saved.name,
         phoneNumber: saved.phoneNumber,
-        branch: saved.schoolCode,
         admissionNumber: saved.admissionNumber,
       });
     }

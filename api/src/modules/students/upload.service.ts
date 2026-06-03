@@ -56,7 +56,7 @@ export class UploadService {
    * Tenant upload context: the effective billing context (mode +
    * transport) and the canonical schoolCode. Students and fees are
    * always stored under the tenant's `tenantCode`, never the Excel
-   * "Code" column or the caller's JWT branch.
+   * "Code" column.
    */
   private async tenantUploadContext(
     tenantId: string,
@@ -77,12 +77,11 @@ export class UploadService {
   async validateFile(
     buffer: Buffer,
     tenantId: string,
-    branch: string,
   ): Promise<ValidateUploadResponseDto> {
     const parsed = parseExcel(buffer);
     const { ctx, schoolCode } = await this.tenantUploadContext(tenantId);
     this.logger.log(
-      `Validating ${parsed.rows.length} rows (tenant=${tenantId}, branch=${branch}, schoolCode=${schoolCode}, mode=${ctx.billingMode})`,
+      `Validating ${parsed.rows.length} rows (tenant=${tenantId}, schoolCode=${schoolCode}, mode=${ctx.billingMode})`,
     );
     const { response } = await this.validationService.validate(
       parsed.rows,
@@ -103,12 +102,11 @@ export class UploadService {
   async confirmUpload(
     buffer: Buffer,
     tenantId: string,
-    branch: string,
   ): Promise<ConfirmUploadResponseDto> {
     const parsed = parseExcel(buffer);
     const { ctx, schoolCode } = await this.tenantUploadContext(tenantId);
     this.logger.log(
-      `Confirming upload (tenant=${tenantId}, branch=${branch}, schoolCode=${schoolCode})`,
+      `Confirming upload (tenant=${tenantId}, schoolCode=${schoolCode})`,
     );
     const { response, validRows } = await this.validationService.validate(
       parsed.rows,
@@ -189,7 +187,6 @@ export class UploadService {
               email: s.email,
               name: s.name,
               phoneNumber: s.phoneNumber,
-              branch: s.schoolCode,
               admissionNumber: s.admissionNumber,
             },
             manager,
@@ -197,7 +194,6 @@ export class UploadService {
         }
 
         const feeInputs: CreateFeeInput[] = rows.map((r) => {
-          const rowSchoolCode = schoolCode;
           const studentId = studentsResult.idByKey.get(
             this.studentsService.key(r.admissionNumber, r.academicYear),
           );
@@ -208,7 +204,6 @@ export class UploadService {
           }
           return {
             tenantId,
-            branch: rowSchoolCode,
             academicYear: r.academicYear,
             studentId,
             term: r.term,
@@ -322,7 +317,6 @@ export class UploadService {
           email: dto.email,
           name: dto.name,
           phoneNumber: dto.phoneNumber,
-          branch: schoolCode,
           admissionNumber: dto.admissionNumber.trim(),
         },
         manager,

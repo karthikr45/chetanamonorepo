@@ -39,11 +39,10 @@ export class MediaController {
   upload(
     @CurrentUser() user: any,
     @UploadedFile() file: Express.Multer.File,
-    @Body() body: { caption?: string; branch?: string },
+    @Body() body: { caption?: string },
   ) {
     return this.mediaService.upload(user.tenantId, file, {
       caption: body?.caption,
-      branch: body?.branch ?? user.branch ?? null,
       uploadedBy: user.userId,
     });
   }

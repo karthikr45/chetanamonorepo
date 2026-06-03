@@ -127,13 +127,13 @@ export class FeesController {
   @ApiOperation({
     summary: 'Add penalty (single, multiple, or all students)',
     description:
-      'Applies a penalty to fees in the current branch+year+term. Use admissionNumbers for selective application (max 500). Use applyToAll=true to apply to every non-PAID fee in scope. PAID fees are silently skipped. Branch is taken from JWT.',
+      'Applies a penalty to fees in the current year+term. Use admissionNumbers for selective application (max 500). Use applyToAll=true to apply to every non-PAID fee in scope. PAID fees are silently skipped.',
   })
   async addPenalty(@Body() dto: AddPenaltyDto, @Req() req: Request) {
-    const { tenantId, branch } = ctxWithBranch(req);
+    const { tenantId } = ctx(req);
     return this.feesService.addPenaltyForStudents(
       tenantId,
-      { ...dto, branch },
+      { ...dto },
       actorOf(req),
     );
   }
@@ -143,16 +143,15 @@ export class FeesController {
   @ApiOperation({
     summary: 'Waive penalty (single, multiple, or all students)',
     description:
-      'Removes the full current penalty from fees in the current branch. Use admissionNumbers for selective waiver (max 500). Use applyToAll=true to waive for every non-PAID fee with penalty > 0. PAID fees and fees with no penalty are silently skipped. Branch is taken from JWT.',
+      'Removes the full current penalty from fees in scope. Use admissionNumbers for selective waiver (max 500). Use applyToAll=true to waive for every non-PAID fee with penalty > 0. PAID fees and fees with no penalty are silently skipped.',
   })
   async waivePenalty(@Body() dto: WaivePenaltyDto, @Req() req: Request) {
-    const { tenantId, branch } = ctxWithBranch(req);
+    const { tenantId } = ctx(req);
     return this.approvals.gate(
       callerOf(req),
       ApprovalAction.PENALTY_WAIVE_BULK,
-      branch,
-      { tenantId, dto: { ...dto, branch }, actor: actorOf(req) },
-      summarize("Waive penalty", dto, branch),
+      { tenantId, dto: { ...dto }, actor: actorOf(req) },
+      summarize("Waive penalty", dto),
     );
   }
 
@@ -161,20 +160,19 @@ export class FeesController {
   @ApiOperation({
     summary: 'Add discount in bulk (single, multiple, or all students)',
     description:
-      'Applies a per-fee discount across the current branch + year + term. ' +
+      'Applies a per-fee discount across the current year + term. ' +
       'Use admissionNumbers for selective application (max 500). Use ' +
       'applyToAll=true to apply to every non-PAID fee in scope. Fees where ' +
       'the discount would invalidate an already-posted payment are silently ' +
-      'skipped. Branch is taken from JWT.',
+      'skipped.',
   })
   async addDiscountBulk(@Body() dto: BulkAddDiscountDto, @Req() req: Request) {
-    const { tenantId, branch } = ctxWithBranch(req);
+    const { tenantId } = ctx(req);
     return this.approvals.gate(
       callerOf(req),
       ApprovalAction.DISCOUNT_ADD_BULK,
-      branch,
-      { tenantId, dto: { ...dto, branch }, actor: actorOf(req) },
-      summarize("Add discount", dto, branch),
+      { tenantId, dto: { ...dto }, actor: actorOf(req) },
+      summarize("Add discount", dto),
     );
   }
 
@@ -185,16 +183,15 @@ export class FeesController {
     description:
       'Removes the entire current discount from fees in scope. Skips PAID ' +
       'fees, fees with no discount, and fees where removing the discount ' +
-      'would invalidate an already-posted payment. Branch is taken from JWT.',
+      'would invalidate an already-posted payment.',
   })
   async waiveDiscountBulk(@Body() dto: WaiveDiscountDto, @Req() req: Request) {
-    const { tenantId, branch } = ctxWithBranch(req);
+    const { tenantId } = ctx(req);
     return this.approvals.gate(
       callerOf(req),
       ApprovalAction.DISCOUNT_WAIVE_BULK,
-      branch,
-      { tenantId, dto: { ...dto, branch }, actor: actorOf(req) },
-      summarize("Waive discount", dto, branch),
+      { tenantId, dto: { ...dto }, actor: actorOf(req) },
+      summarize("Waive discount", dto),
     );
   }
 
@@ -215,7 +212,6 @@ export class FeesController {
     return this.approvals.gate(
       callerOf(req),
       ApprovalAction.DISCOUNT_ADD_SINGLE,
-      null,
       { tenantId, feeId, amount: dto.amount, reason: dto.reason, actor: actorOf(req) },
       `Add discount ₹${dto.amount} on one fee${dto.reason ? ` — ${dto.reason}` : ""}`,
     );
@@ -261,7 +257,6 @@ export class FeesController {
     return this.approvals.gate(
       callerOf(req),
       ApprovalAction.PENALTY_WAIVE_SINGLE,
-      null,
       { tenantId, feeId, amount: dto.amount, reason: dto.reason, actor: actorOf(req) },
       `Waive penalty${dto.amount ? ` ₹${dto.amount}` : " (full)"} on one fee${dto.reason ? ` — ${dto.reason}` : ""}`,
     );
@@ -284,7 +279,6 @@ export class FeesController {
     return this.approvals.gate(
       callerOf(req),
       ApprovalAction.DISCOUNT_WAIVE_SINGLE,
-      null,
       { tenantId, feeId, amount: dto.amount, reason: dto.reason, actor: actorOf(req) },
       `Waive discount${dto.amount ? ` ₹${dto.amount}` : " (full)"} on one fee${dto.reason ? ` — ${dto.reason}` : ""}`,
     );
@@ -518,7 +512,6 @@ export class FeesController {
 interface AuthContext {
   tenantId: string;
   userId: string;
-  branch: string | null;
 }
 
 function ctx(req: Request): AuthContext {
@@ -529,7 +522,6 @@ function ctx(req: Request): AuthContext {
   return {
     tenantId: user.tenantId,
     userId: user.userId,
-    branch: user.branch ?? null,
   };
 }
 
@@ -553,13 +545,12 @@ function summarize(
     academicYear?: string;
     term?: string;
   },
-  branch: string,
 ): string {
   const who = dto.applyToAll
     ? "all students"
     : `${dto.admissionNumbers?.length ?? 0} student(s)`;
   const amt = dto.amount != null ? ` ₹${dto.amount}` : "";
-  const scope = [branch, dto.academicYear, dto.term]
+  const scope = [dto.academicYear, dto.term]
     .filter(Boolean)
     .join(" · ");
   return `${label}${amt} for ${who}${scope ? ` (${scope})` : ""}${
@@ -586,16 +577,6 @@ function callerOf(req: Request): {
   };
 }
 
-/** Variant that requires the user's JWT to carry a branch. Throws 403 otherwise. */
-function ctxWithBranch(req: Request): AuthContext & { branch: string } {
-  const c = ctx(req);
-  if (!c.branch) {
-    throw new ForbiddenException(
-      'Your account is not scoped to a branch — this endpoint requires a branch-scoped token.',
-    );
-  }
-  return { ...c, branch: c.branch };
-}
 function buildUuidPipe(paramName: string) {
   return new ParseUUIDPipe({
     version: '4',

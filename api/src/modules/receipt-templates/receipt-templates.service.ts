@@ -429,7 +429,7 @@ export class ReceiptTemplatesService {
         ? {
             term: fee.term ?? '',
             academicYear: fee.academicYear ?? '',
-            branch: fee.branch ?? '',
+            branch: student?.schoolCode ?? '',
             originalAmount: fee.originalAmount ?? '0',
             totalPenalty: fee.totalPenalty ?? '0',
             totalDiscount: fee.totalDiscount ?? '0',

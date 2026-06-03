@@ -17,11 +17,6 @@ export class UpdateAdminDto {
   @IsOptional()
   role?: string;
 
-  @ApiPropertyOptional({ example: 'Main Branch' })
-  @IsString()
-  @IsOptional()
-  branch?: string;
-
   @ApiPropertyOptional({ example: 'NewPass@123', minLength: 6 })
   @IsString()
   @MinLength(6)

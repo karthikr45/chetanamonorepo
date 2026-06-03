@@ -22,11 +22,6 @@ export class UpdateTenantAdminDto {
   @IsOptional()
   role?: string;
 
-  @ApiPropertyOptional()
-  @IsString()
-  @IsOptional()
-  branch?: string;
-
   @ApiPropertyOptional({ minLength: 6 })
   @IsString()
   @MinLength(6)

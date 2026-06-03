@@ -20,7 +20,6 @@ export class MediaService {
     tenantId: string,
     file: Express.Multer.File,
     opts: {
-      branch?: string | null;
       caption?: string;
       uploadedBy?: string | null;
     },
@@ -37,7 +36,6 @@ export class MediaService {
 
     const media = this.mediaRepo.create({
       tenantId,
-      branch: opts.branch ?? null,
       url,
       storageKey: key,
       fileName: file.originalname ?? null,

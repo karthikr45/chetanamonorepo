@@ -41,10 +41,10 @@ export class StudentsDetailsController {
       throw new BadRequestException('academicYear query param is required');
     }
 
-    const { tenantId, branch } = ctxWithBranch(req);
+    const { tenantId } = ctx(req);
     const student = await this.studentsService.findByAdmissionYear(
       tenantId,
-      branch,
+      '',
       admission.trim(),
       academicYear.trim(),
     );
@@ -60,7 +60,6 @@ export class StudentsDetailsController {
 interface AuthContext {
   tenantId: string;
   userId: string;
-  branch: string | null;
 }
 
 function ctx(req: Request): AuthContext {
@@ -71,16 +70,5 @@ function ctx(req: Request): AuthContext {
   return {
     tenantId: user.tenantId,
     userId: user.userId,
-    branch: user.branch ?? null,
   };
-}
-
-function ctxWithBranch(req: Request): AuthContext & { branch: string } {
-  const c = ctx(req);
-  if (!c.branch) {
-    throw new BadRequestException(
-      'Your account is not scoped to a branch. This endpoint requires a branch-scoped token.',
-    );
-  }
-  return { ...c, branch: c.branch };
 }

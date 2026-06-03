@@ -40,7 +40,6 @@ export class ApprovalsService {
   async gate(
     caller: ApprovalCaller,
     action: ApprovalAction,
-    branch: string | null,
     payload: Record<string, any>,
     summary: string,
   ): Promise<unknown> {
@@ -50,7 +49,6 @@ export class ApprovalsService {
     const saved = await this.repo.save(
       this.repo.create({
         tenantId: caller.tenantId,
-        branch,
         action,
         status: ApprovalStatus.PENDING,
         summary,

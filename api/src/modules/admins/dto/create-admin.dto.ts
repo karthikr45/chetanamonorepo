@@ -34,11 +34,6 @@ export class CreateAdminDto {
   @IsNotEmpty()
   role: string;
 
-  @ApiPropertyOptional({ example: 'Main Branch' })
-  @IsString()
-  @IsOptional()
-  branch?: string;
-
   @ApiPropertyOptional({
     example: 'Welcome@123',
     description: 'Initial password. Defaults to system default if omitted.',

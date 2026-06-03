@@ -25,7 +25,6 @@ interface ParentJwtPayload {
   email: string;
   role: Role;
   tenantId: string;
-  branch: null;
   name?: string;
 }
 
@@ -319,7 +318,6 @@ export class ParentAuthService {
       email: parent.email,
       role: Role.PARENT,
       tenantId: parent.tenantId,
-      branch: null,
       name: parent.name,
     };
 

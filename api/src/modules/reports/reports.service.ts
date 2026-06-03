@@ -12,7 +12,6 @@ import { Student } from '../students/entities/student.entity';
 export interface ReportFilters {
   from?: string;
   to?: string;
-  branch?: string;
   academicYear?: string;
   class?: string;
   term?: string;
@@ -51,8 +50,6 @@ export class ReportsService {
       });
 
     this.applyDateRange(qb, 'fp.paidAt', filters);
-    if (filters.branch)
-      qb.andWhere('fp.branch = :branch', { branch: filters.branch });
     if (filters.academicYear)
       qb.andWhere('fee.academicYear = :ay', { ay: filters.academicYear });
     if (filters.class)
@@ -73,7 +70,7 @@ export class ReportsService {
         'st.section AS section',
         'fee.term AS term',
         'fee.academicYear AS "academicYear"',
-        'fp.branch AS branch',
+        'st.schoolCode AS "schoolCode"',
       ])
       .orderBy('fp.paidAt', 'DESC')
       .getRawMany();
@@ -112,8 +109,6 @@ export class ReportsService {
       .where('fee.tenantId = :tenantId', { tenantId })
       .andWhere('(fee.netAmount - fee.paidAmount) > 0');
 
-    if (filters.branch)
-      qb.andWhere('fee.branch = :branch', { branch: filters.branch });
     if (filters.academicYear)
       qb.andWhere('fee.academicYear = :ay', { ay: filters.academicYear });
     if (filters.class)
@@ -129,7 +124,7 @@ export class ReportsService {
         'st.section AS section',
         'fee.term AS term',
         'fee.academicYear AS "academicYear"',
-        'fee.branch AS branch',
+        'st.schoolCode AS "schoolCode"',
         'fee.netAmount AS "netAmount"',
         'fee.paidAmount AS "paidAmount"',
         '(fee.netAmount - fee.paidAmount) AS balance',
@@ -170,8 +165,6 @@ export class ReportsService {
     } else {
       this.applyDateRange(qb, 'fp.paidAt', filters);
     }
-    if (filters.branch)
-      qb.andWhere('fp.branch = :branch', { branch: filters.branch });
 
     const rows = await qb
       .select("to_char(fp.paidAt, 'YYYY-MM-DD')", 'day')

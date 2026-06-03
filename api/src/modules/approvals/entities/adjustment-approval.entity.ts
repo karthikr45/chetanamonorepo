@@ -35,9 +35,6 @@ export class AdjustmentApproval {
   @Column({ name: 'tenant_id', type: 'uuid' })
   tenantId: string;
 
-  @Column({ type: 'varchar', length: 100, nullable: true })
-  branch: string | null;
-
   @Column({ type: 'enum', enum: ApprovalAction })
   action: ApprovalAction;
 

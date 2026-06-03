@@ -65,14 +65,13 @@ export enum PaymentStatus {
  * Individual payments live in `fee_payments` — one row per installment.
  */
 @Entity('fees')
-@Unique('uq_fees_tenant_branch_student_year_term', [
+@Unique('uq_fees_tenant_student_year_term', [
   'tenantId',
-  'branch',
   'studentId',
   'academicYear',
   'term',
 ])
-@Index('idx_fees_tenant_branch_year', ['tenantId', 'branch', 'academicYear'])
+@Index('idx_fees_tenant_year', ['tenantId', 'academicYear'])
 @Index('idx_fees_tenant_status', ['tenantId', 'paymentStatus'])
 @Check('chk_fees_original_amount_non_negative', '"original_amount" >= 0')
 @Check('chk_fees_penalty_non_negative', '"total_penalty" >= 0')
@@ -84,9 +83,6 @@ export class Fee {
 
   @Column({ name: 'tenant_id', type: 'uuid' })
   tenantId: string;
-
-  @Column({ type: 'varchar', length: 100 })
-  branch: string;
 
   @Column({ name: 'academic_year', type: 'varchar', length: 20 })
   academicYear: string;
