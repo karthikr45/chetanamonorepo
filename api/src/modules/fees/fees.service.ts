@@ -5,7 +5,7 @@ import {
   BadRequestException,
 } from '@nestjs/common';
 import { InjectRepository, InjectDataSource } from '@nestjs/typeorm';
-import { DataSource, EntityManager, In, Repository } from 'typeorm';
+import { DataSource, EntityManager, In, IsNull, Not, Repository } from 'typeorm';
 import { Fee, PaymentStatus, TermType } from './entities/fee.entity';
 import {
   SIBLING_TENANT_TYPES,
@@ -13,6 +13,10 @@ import {
   TenantTypeValue,
 } from '../../common/constants/tenant';
 import { FeePayment, ClearanceStatus, PaymentType } from './entities/fee-payment.entity';
+import {
+  PaymentStatus as PaymentRowStatus,
+  PaymentType as PaymentChannel,
+} from '../payments/entities/payment.entity';
 import { FeeAdjustment, FeeAdjustmentKind } from './entities/fee-adjustment.entity';
 import { ReceiptSequence } from './entities/receipt-sequence.entity';
 import {
@@ -950,37 +954,71 @@ async waivePenaltyForStudents(
           ? ClearanceStatus.PENDING
           : ClearanceStatus.NA;
 
+      const repo = manager.getRepository(FeePayment);
+      const paidAtDate = input.paidAt ? new Date(input.paidAt) : new Date();
+      const channel = ONLINE_TYPES.has(input.paymentType)
+        ? PaymentChannel.ONLINE
+        : PaymentChannel.OFFLINE;
+
+      // Online payments already have a gateway-order row in `payments`
+      // (created at checkout). Finalise THAT row into the settled ledger
+      // entry instead of inserting a duplicate. Idempotent: if it already
+      // carries a receipt number it has been recognised — return as-is.
+      let payment: FeePayment | null = null;
+      if (input.orderId) {
+        payment = await repo.findOne({
+          where: { tenantId, gatewayOrderId: input.orderId },
+        });
+        if (payment?.receiptNumber) return payment;
+      }
+
       const receiptNumber = await this.generateReceiptNumber(
         manager,
         tenantId,
-        input.paidAt ? new Date(input.paidAt) : new Date(),
+        paidAtDate,
         fee.academicYear,
       );
 
-      const payment = manager.getRepository(FeePayment).create({
-        tenantId,
-        feeId,
-        amount: input.amount.toFixed(2),
-        paymentType: input.paymentType,
-        receiptNumber,
-        orderId: input.orderId,
-        transactionId: input.transactionId,
-        chequeNumber: input.chequeNumber ?? null,
-        chequeDate: input.chequeDate ? new Date(input.chequeDate) : null,
-        ddNumber: input.ddNumber ?? null,
-        ddDate: input.ddDate ? new Date(input.ddDate) : null,
-        bankName: input.bankName ?? null,
-        bankBranch: input.bankBranch ?? null,
-        drawerName: input.drawerName ?? null,
-        cardLast4: input.cardLast4 ?? null,
-        notes: input.notes ?? null,
-        clearanceStatus,
-        paidAt: input.paidAt ? new Date(input.paidAt) : new Date(),
-        recordedBy: input.recordedBy,
-      });
-      const savedPayment = await manager
-        .getRepository(FeePayment)
-        .save(payment);
+      if (payment) {
+        // Finalise the existing online order row.
+        payment.feeId = feeId;
+        payment.paymentType = channel;
+        payment.method = input.paymentType;
+        payment.status = PaymentRowStatus.PAID;
+        payment.amount = input.amount.toFixed(2);
+        payment.receiptNumber = receiptNumber;
+        payment.orderId = input.orderId;
+        payment.transactionId = input.transactionId;
+        payment.clearanceStatus = clearanceStatus;
+        payment.notes = input.notes ?? payment.notes ?? null;
+        payment.paidAt = paidAtDate;
+        payment.recordedBy = input.recordedBy;
+      } else {
+        payment = repo.create({
+          tenantId,
+          feeId,
+          amount: input.amount.toFixed(2),
+          paymentType: channel,
+          method: input.paymentType,
+          status: PaymentRowStatus.PAID,
+          receiptNumber,
+          orderId: input.orderId,
+          transactionId: input.transactionId,
+          chequeNumber: input.chequeNumber ?? null,
+          chequeDate: input.chequeDate ? new Date(input.chequeDate) : null,
+          ddNumber: input.ddNumber ?? null,
+          ddDate: input.ddDate ? new Date(input.ddDate) : null,
+          bankName: input.bankName ?? null,
+          bankBranch: input.bankBranch ?? null,
+          drawerName: input.drawerName ?? null,
+          cardLast4: input.cardLast4 ?? null,
+          notes: input.notes ?? null,
+          clearanceStatus,
+          paidAt: paidAtDate,
+          recordedBy: input.recordedBy,
+        });
+      }
+      const savedPayment = await repo.save(payment);
 
       // Pending cheque/DD payments do NOT add to paid_amount yet —
       // only on clearance (see updateClearance). Cash/POS/online/NEFT
@@ -1024,8 +1062,8 @@ async waivePenaltyForStudents(
       });
       if (!fp) throw new NotFoundException(`fee_payment ${feePaymentId} not found`);
       if (
-        fp.paymentType !== PaymentType.CHEQUE &&
-        fp.paymentType !== PaymentType.DD
+        fp.method !== PaymentType.CHEQUE &&
+        fp.method !== PaymentType.DD
       ) {
         throw new BadRequestException(
           'Only CHEQUE / DD payments have a clearance step',
@@ -1033,6 +1071,9 @@ async waivePenaltyForStudents(
       }
       if (fp.clearanceStatus === status) {
         return fp; // idempotent
+      }
+      if (!fp.feeId) {
+        throw new BadRequestException('Payment is not linked to a fee');
       }
 
       const fee = await this.lockFee(manager, tenantId, fp.feeId);
@@ -1228,11 +1269,16 @@ async waivePenaltyForStudents(
     const payments = await this.dataSource
       .getRepository(FeePayment)
       .find({
-        where: { tenantId, feeId: In(fees.map((f) => f.id)) },
+        where: {
+          tenantId,
+          feeId: In(fees.map((f) => f.id)),
+          receiptNumber: Not(IsNull()),
+        },
         order: { paidAt: 'ASC' },
       });
     const byFee = new Map<string, FeePayment[]>();
     for (const p of payments) {
+      if (!p.feeId) continue;
       if (!byFee.has(p.feeId)) byFee.set(p.feeId, []);
       byFee.get(p.feeId)!.push(p);
     }
@@ -1247,7 +1293,7 @@ async waivePenaltyForStudents(
     return this.dataSource
       .getRepository(FeePayment)
       .find({
-        where: { tenantId, feeId },
+        where: { tenantId, feeId, receiptNumber: Not(IsNull()) },
         order: { paidAt: 'ASC' },
       });
   }
@@ -1277,15 +1323,17 @@ async waivePenaltyForStudents(
         'student.id = fee.student_id',
       )
       .where('fp.tenantId = :tenantId', { tenantId })
+      // Ledger entries only — exclude unrecognised gateway orders.
+      .andWhere('fp.receipt_number IS NOT NULL')
       .orderBy('fp.paidAt', 'DESC')
       .limit(500);
 
     if (filters.type === 'online') {
-      qb.andWhere('fp.paymentType IN (:...online)', {
+      qb.andWhere('fp.method IN (:...online)', {
         online: ['RAZORPAY', 'CASHFREE', 'UPI', 'NETBANKING', 'CARD'],
       });
     } else if (filters.type === 'offline') {
-      qb.andWhere('fp.paymentType IN (:...offline)', {
+      qb.andWhere('fp.method IN (:...offline)', {
         offline: ['CASH', 'CHEQUE', 'DD', 'POS', 'NEFT'],
       });
     }

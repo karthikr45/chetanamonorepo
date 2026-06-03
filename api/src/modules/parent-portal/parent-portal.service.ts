@@ -5,7 +5,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { InjectDataSource, InjectRepository } from '@nestjs/typeorm';
-import { DataSource, In, Repository } from 'typeorm';
+import { DataSource, In, IsNull, Not, Repository } from 'typeorm';
 import { Student } from '../students/entities/student.entity';
 import { Fee } from '../fees/entities/fee.entity';
 import {
@@ -221,11 +221,16 @@ export class ParentPortalService {
   ): Promise<(Fee & { feePaymentId: string | null })[]> {
     if (!fees.length) return [];
     const payments = await this.feePaymentRepo.find({
-      where: { tenantId, feeId: In(fees.map((f) => f.id)) },
+      where: {
+        tenantId,
+        feeId: In(fees.map((f) => f.id)),
+        receiptNumber: Not(IsNull()),
+      },
       order: { paidAt: 'DESC', createdAt: 'DESC' },
     });
     const latestByFee = new Map<string, string>();
     for (const p of payments) {
+      if (!p.feeId) continue;
       if (!latestByFee.has(p.feeId)) latestByFee.set(p.feeId, p.id);
     }
     return fees.map((f) => ({
@@ -494,6 +499,7 @@ export class ParentPortalService {
       where: {
         tenantId: categoryTenantId,
         feeId: In(fees.map((f) => f.id)),
+        receiptNumber: Not(IsNull()),
       },
       order: { paidAt: 'DESC' },
     });
@@ -520,17 +526,17 @@ export class ParentPortalService {
     }
     const yearOfFee = new Map(fees.map((f) => [f.id, f.academicYear]));
     for (const p of payments) {
-      const yr = yearOfFee.get(p.feeId);
+      const yr = p.feeId ? yearOfFee.get(p.feeId) : undefined;
       if (!yr || !byYear.has(yr)) continue;
       byYear.get(yr)!.payments.push({
         feePaymentId: p.id,
         amount: p.amount,
-        paymentType: p.paymentType,
+        paymentType: p.method,
         paidAt: p.paidAt,
         receiptNumber: p.receiptNumber,
         clearanceStatus: p.clearanceStatus,
         bounced: p.clearanceStatus === ClearanceStatus.BOUNCED,
-        term: feeTermById.get(p.feeId) ?? null,
+        term: (p.feeId ? feeTermById.get(p.feeId) : null) ?? null,
       });
     }
     const years = [...byYear.entries()]
@@ -639,7 +645,7 @@ export class ParentPortalService {
     const fp = await this.feePaymentRepo.findOne({
       where: { id: feePaymentId },
     });
-    if (!fp) throw new NotFoundException('Receipt not found');
+    if (!fp || !fp.feeId) throw new NotFoundException('Receipt not found');
     const fee = await this.feeRepo.findOne({
       where: { id: fp.feeId, tenantId: fp.tenantId },
     });

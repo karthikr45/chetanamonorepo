@@ -2,7 +2,6 @@ import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { Student } from '../students/entities/student.entity';
 import { Fee } from '../fees/entities/fee.entity';
-import { FeePayment } from '../fees/entities/fee-payment.entity';
 import { Payment } from '../payments/entities/payment.entity';
 import { ParentStudent } from '../parents/entities/parent-student.entity';
 import { Tenant } from '../tenants/entities/tenant.entity';
@@ -20,7 +19,6 @@ import { ParentPortalController } from './parent-portal.controller';
     TypeOrmModule.forFeature([
       Student,
       Fee,
-      FeePayment,
       Payment,
       ParentStudent,
       Tenant,

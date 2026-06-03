@@ -42,8 +42,8 @@ identifying the institution (shared across sibling tenants).
                                 │ N
                                 ▼
                          ┌──────────────┐
-                         │ fee_payments │  one row per part-payment
-                         └──────────────┘
+                         │   payments   │  unified ledger — one row per
+                         └──────────────┘  payment (online order + settled)
 
                          ┌─────────────┐
                          │   parents   │
@@ -115,7 +115,7 @@ fees
 ├── total_penalty       decimal(12,2)              default 0  -- sum of applied penalties
 ├── total_discount      decimal(12,2)              default 0  -- sibling/staff/EWS/scholarship
 ├── net_amount          decimal(12,2)              NOT NULL  -- original + penalty − discount
-├── paid_amount         decimal(12,2)              default 0  -- sum of fee_payments.amount
+├── paid_amount         decimal(12,2)              default 0  -- sum of recognised payments.amount
 ├── payment_status      ENUM('UNPAID','PARTIAL','PAID')  default 'UNPAID'
 ├── created_at          timestamptz                default now()
 └── updated_at          timestamptz                default now()
@@ -139,74 +139,75 @@ CHECK  paid_amount      >= 0
 
 (Maintained by the service when payments are recorded.)
 
-## `fee_payments` (part-payments ledger)
+## `payments` (the single unified ledger)
 
-One row **per installment**. A fee with three part-payments has three
-rows here. Online payments come from the gateway webhook; offline
-payments are recorded by admin staff.
+There is **one** payments table. It is both the gateway-order tracker and
+the settled-payment ledger — the `fee_payments` table has been removed and
+folded in here.
 
-```sql
-fee_payments
-├── id                  uuid PK
-├── tenant_id           uuid                       NOT NULL
-├── fee_id              uuid                       NOT NULL FK → fees.id
-├── amount              decimal(12,2)              NOT NULL  CHECK > 0
-├── payment_type        ENUM(                       NOT NULL
-│                          'RAZORPAY','CASHFREE','UPI','NETBANKING','CARD',  -- online
-│                          'CASH','CHEQUE','DD','NEFT')                      -- offline
-├── order_id            varchar(100)               NULL   -- gateway order id
-├── transaction_id      varchar(100)               NULL   -- gateway txn id
-├── cheque_number       varchar(50)                NULL
-├── cheque_date         date                       NULL
-├── dd_number           varchar(50)                NULL
-├── dd_date             date                       NULL
-├── bank_name           varchar(100)               NULL
-├── paid_at             timestamptz                NOT NULL
-├── recorded_by         uuid                       NULL   -- admin user id (null for webhook)
-└── created_at          timestamptz                default now()
+A row plays two roles over its lifetime:
 
-INDEX  (fee_id)                          └─ idx_fp_fee
-INDEX  (tenant_id, paid_at)              └─ idx_fp_tenant_paid_at
-CHECK  amount > 0                        └─ chk_fp_amount_positive
-FK     fee_id ON DELETE RESTRICT          (cannot delete a fee that has payments)
-```
+1. **Gateway order** (online): created with `status='created'` and a
+   `gateway_order_id` when checkout starts.
+2. **Settled ledger entry**: once recognised it carries a `receipt_number`,
+   a `method`, and (for cheque/DD) a `clearance_status`. Offline payments
+   are inserted directly in this settled form. On a successful online
+   payment the *same* order row is finalised — no second row is created.
 
-## `payments` (gateway order tracking — separate from fee_payments)
-
-This is the gateway-order side of online payments. When a parent clicks
-"Pay via Razorpay", a row is created here with `status=CREATED` and the
-gateway's order id; on success, the webhook flips it to `PAID` and
-inserts the matching `fee_payments` row.
+A row counts as a **ledger entry** (collections, receipts, statements,
+`fees.paid_amount`) exactly when **`receipt_number IS NOT NULL`** — so
+`created`/`failed` orders are naturally excluded. `amount` is in **rupees**.
 
 ```sql
 payments
 ├── id                  uuid PK
 ├── tenant_id           varchar                    NOT NULL
 ├── fee_id              uuid                       NULL   FK → fees.id (set null on fee delete)
-├── payment_type        ENUM('online','offline')   default 'online'
+├── payment_type        ENUM('online','offline')   default 'online'  -- channel
+├── method              ENUM(                       NULL  -- concrete instrument
+│                          'RAZORPAY','CASHFREE','UPI','NETBANKING','CARD',  -- online
+│                          'CASH','CHEQUE','DD','POS','NEFT')                -- offline
 ├── gateway             ENUM('razorpay','cashfree') NULL
 ├── status              ENUM('created','paid','failed','refunded')  default 'created'
+├── amount              decimal(12,2)              NOT NULL  -- rupees
+├── currency            varchar                    default 'INR'
+├── receipt_number      varchar(50)  UNIQUE        NULL   -- set when recognised
 ├── gateway_order_id    varchar UNIQUE             NULL
 ├── gateway_payment_id  varchar                    NULL
+├── order_id            varchar(100)               NULL
+├── transaction_id      varchar(100)               NULL
 ├── cheque_number       varchar(50)                NULL
 ├── cheque_date         date                       NULL
+├── dd_number           varchar(50)                NULL
 ├── dd_date             date                       NULL
-├── amount              int                        NOT NULL  -- in paise
-├── currency            varchar                    default 'INR'
-├── notes               varchar                    NULL  -- JSON-encoded admission/year/term/student
+├── bank_name           varchar(100)               NULL
+├── bank_branch         varchar(100)               NULL
+├── drawer_name         varchar(150)               NULL
+├── card_last4          varchar(4)                 NULL
+├── clearance_status    ENUM('PENDING','CLEARED','BOUNCED','NA')  default 'NA'
+├── notes               text                       NULL
 ├── paid_at             timestamptz                NULL
+├── recorded_by         uuid                       NULL   -- admin user id (null for gateway/webhook)
 ├── failure_reason      text                       NULL
-├── refunded_amount     int                        NULL
+├── refunded_amount     decimal(12,2)              NULL
 ├── refunded_at         timestamptz                NULL
 ├── created_at          timestamptz                default now()
 └── updated_at          timestamptz                default now()
 
+UNIQUE (receipt_number)                  └─ uq_payments_receipt_number
 INDEX  (tenant_id, status)
 INDEX  (tenant_id, created_at)
+INDEX  (tenant_id, paid_at)              └─ idx_payments_tenant_paid_at
+INDEX  (tenant_id, clearance_status)     └─ idx_payments_tenant_clearance
+INDEX  (fee_id)                          └─ idx_payments_fee
 ```
 
+**Cheque/DD clearance:** recorded with `clearance_status='PENDING'` and a
+`receipt_number`, but they do **not** add to `fees.paid_amount` until marked
+`CLEARED`. `BOUNCED` reverses a previously-cleared amount.
+
 Plus `transactions` and `payment_audit_logs` tables that record every
-state transition for auditing — out of scope for the students view.
+gateway state transition for auditing — out of scope for the students view.
 
 ## `parents` and `parent_students`
 
@@ -303,21 +304,22 @@ fees:
            orig=25000, discount={2000,2000,0,0}, net={23000,23000,25000,25000}
            paid_amount=0, payment_status=UNPAID
 
-fee_payments: (none yet)
+payments: (none yet)
 ```
 
 After the parent pays ₹10,000 toward term 1 via Razorpay:
 
 ```
-payments:    1 row — gateway=razorpay, status=paid, fee_id=<term1.id>, amount=1000000 (paise)
-fee_payments: 1 row — fee_id=<term1.id>, amount=10000, payment_type=RAZORPAY, paid_at=<now>
+payments: 1 row — fee_id=<term1.id>, channel=online, method=RAZORPAY, status=paid,
+                  amount=10000.00 (rupees), receipt_number set, clearance=NA
+                  (the gateway-order row, finalised in place — no second row)
 fees (term1): paid_amount=10000, payment_status=PARTIAL  (since 0 < 10000 < 23000)
 ```
 
-After the parent pays the remaining ₹13,000:
+After the parent pays the remaining ₹13,000 (a new order):
 
 ```
-fee_payments: 2 rows under term1
+payments: 2 rows under term1 (each a recognised ledger entry)
 fees (term1): paid_amount=23000, payment_status=PAID
 ```
 

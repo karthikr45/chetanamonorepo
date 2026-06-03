@@ -51,10 +51,10 @@ export class PaymentsService {
     amountPaidInRupees: number,
     gateway: PaymentGateway,
   ): Promise<FeePayment> {
-    const existing = await this.feePaymentRepository.findOne({
-      where: { tenantId, feeId, orderId },
-    });
-    if (existing) return existing;
+    // Finalises the existing gateway-order row in `payments` into a settled
+    // ledger entry. Idempotent by gatewayOrderId (a row that already carries
+    // a receipt number is returned untouched), so verify-then-webhook (or
+    // vice-versa) can't double-count.
     return this.feesService.recordOnlinePayment(tenantId, feeId, {
       amount: amountPaidInRupees,
       paymentType:
@@ -149,7 +149,8 @@ export class PaymentsService {
           gateway: null,
           status: PaymentStatus.PAID,
           gatewayOrderId: null,
-          amount: dto.amount,
+          // `payments.amount` is in rupees; offline DTO amount is in paise.
+          amount: (dto.amount / 100).toFixed(2),
           currency: dto.currency,
           notes: JSON.stringify(notes),
           chequeNumber: dto.chequeNumber ?? null,
@@ -216,7 +217,11 @@ export class PaymentsService {
         gateway: dto.gateway!,
         status: PaymentStatus.CREATED,
         gatewayOrderId: result.gatewayOrderId,
-        amount: result.amount,
+        // `payments.amount` is rupees. Razorpay returns paise; Cashfree rupees.
+        amount: (dto.gateway === PaymentGateway.CASHFREE
+          ? result.amount
+          : result.amount / 100
+        ).toFixed(2),
         currency: result.currency,
         notes: JSON.stringify(notes),
         chequeNumber: null,
@@ -327,7 +332,7 @@ export class PaymentsService {
           status: paymentStatus,
           gatewayOrderId: orderId,
           gatewayPaymentId: paymentId,
-          amount: payment.amount,
+          amount: Number(payment.amount),
           currency: payment.currency,
           notes: payment.notes,
           paymentDetails: {
@@ -376,7 +381,7 @@ export class PaymentsService {
         status: paymentStatus,
         gatewayOrderId: orderId,
         gatewayPaymentId: result.gatewayPaymentId,
-        amount: payment.amount,
+        amount: Number(payment.amount),
         currency: payment.currency,
         notes: payment.notes,
         paymentDetails: {

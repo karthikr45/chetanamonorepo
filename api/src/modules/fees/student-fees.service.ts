@@ -13,7 +13,7 @@ export interface FeePaymentView {
   chequeNumber: string | null;
   ddNumber: string | null;
   bankName: string | null;
-  paidAt: Date;
+  paidAt: Date | null;
 }
 
 export interface StudentFeeSummary {
@@ -101,11 +101,14 @@ export class StudentFeesService {
       .createQueryBuilder('p')
       .where('p.feeId IN (:...feeIds)', { feeIds })
       .andWhere('p.tenantId = :tenantId', { tenantId })
+      // Settled ledger entries only — skip unrecognised gateway orders.
+      .andWhere('p.receipt_number IS NOT NULL')
       .orderBy('p.paidAt', 'DESC')
       .getMany();
 
     const paymentsByFeeId = new Map<string, FeePayment[]>();
     for (const p of payments) {
+      if (!p.feeId) continue;
       if (!paymentsByFeeId.has(p.feeId)) paymentsByFeeId.set(p.feeId, []);
       paymentsByFeeId.get(p.feeId)!.push(p);
     }
@@ -126,7 +129,7 @@ export class StudentFeesService {
         payments: (paymentsByFeeId.get(fee.id) ?? []).map((p) => ({
           id: p.id,
           amount: p.amount,
-          paymentType: p.paymentType,
+          paymentType: p.method ?? '',
           orderId: p.orderId,
           transactionId: p.transactionId,
           chequeNumber: p.chequeNumber,

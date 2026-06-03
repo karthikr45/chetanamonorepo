@@ -6,7 +6,6 @@ import { Payment } from './entities/payment.entity';
 import { Transaction } from './entities/transaction.entity';
 import { PaymentAuditLog } from './entities/payment-audit-log.entity';
 import { Fee } from '../fees/entities/fee.entity';
-import { FeePayment } from '../fees/entities/fee-payment.entity';
 import { PaymentAuditService } from './payment-audit.service';
 import { PaymentGatewayFactory } from './gateways/payment-gateway.factory';
 import { RazorpayGateway } from './gateways/razorpay.gateway';
@@ -26,7 +25,6 @@ import { FeesModule } from '../fees/fees.module';
       Transaction,
       PaymentAuditLog,
       Fee,
-      FeePayment,
       // Direct repo access for the webhook verifier — it needs to read
       // payment_secret_key per tenant before the signature check.
       TenantConfig,

@@ -85,7 +85,7 @@ export class ReceiptStorageService {
     const fp = await this.feePaymentRepo.findOne({
       where: { id: feePaymentId, tenantId },
     });
-    if (!fp) throw new NotFoundException('Receipt not found.');
+    if (!fp || !fp.feeId) throw new NotFoundException('Receipt not found.');
 
     const fee = await this.feeRepo.findOne({
       where: { id: fp.feeId, tenantId },
@@ -119,8 +119,9 @@ export class ReceiptStorageService {
    * with no external assets beyond the logo image.
    */
   private buildReceiptHtml(fp: FeePayment, fee: Fee, student: Student): string {
-    const offlinePayment = OFFLINE_TYPES.has(fp.paymentType);
-    const paymentMode = MODE_LABELS[fp.paymentType] ?? fp.paymentType;
+    const offlinePayment = fp.method ? OFFLINE_TYPES.has(fp.method) : false;
+    const paymentMode =
+      (fp.method ? MODE_LABELS[fp.method] : null) ?? fp.method ?? '';
     const receiptDate = fmtDate(fp.paidAt);
     const paymentDate = fmtDate(fp.paidAt);
     const printedDate = fmtDate(new Date());

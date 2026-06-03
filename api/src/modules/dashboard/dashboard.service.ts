@@ -86,7 +86,9 @@ export class DashboardService {
       const qb = this.paymentRepo
         .createQueryBuilder('fp')
         .select('COALESCE(SUM(fp.amount), 0)', 'total')
-        .where('fp.clearanceStatus IN (:...statuses)', {
+        // Settled ledger entries only — exclude unrecognised gateway orders.
+        .where('fp.receipt_number IS NOT NULL')
+        .andWhere('fp.clearanceStatus IN (:...statuses)', {
           statuses: [ClearanceStatus.CLEARED, ClearanceStatus.NA],
         })
         .andWhere('fp.paidAt >= :from', { from });

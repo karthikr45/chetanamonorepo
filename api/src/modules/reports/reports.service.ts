@@ -45,6 +45,7 @@ export class ReportsService {
         'st.id = fee.studentId AND st.tenantId = fp.tenantId',
       )
       .where('fp.tenantId = :tenantId', { tenantId })
+      .andWhere('fp.receipt_number IS NOT NULL')
       .andWhere('fp.clearanceStatus != :bounced', {
         bounced: ClearanceStatus.BOUNCED,
       });
@@ -61,7 +62,7 @@ export class ReportsService {
         'fp.id AS id',
         'fp.paidAt AS "paidAt"',
         'fp.amount AS amount',
-        'fp.paymentType AS "paymentType"',
+        'fp.method AS "paymentType"',
         'fp.clearanceStatus AS "clearanceStatus"',
         'fp.receiptNumber AS "receiptNumber"',
         'st.name AS "studentName"',
@@ -152,6 +153,7 @@ export class ReportsService {
     const qb = this.feePaymentRepo
       .createQueryBuilder('fp')
       .where('fp.tenantId = :tenantId', { tenantId })
+      .andWhere('fp.receipt_number IS NOT NULL')
       .andWhere('fp.clearanceStatus != :bounced', {
         bounced: ClearanceStatus.BOUNCED,
       });

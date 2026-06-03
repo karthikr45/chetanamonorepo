@@ -326,9 +326,11 @@ export class ReceiptTemplatesService {
         where: { id: args.paymentId, tenantId },
       });
       if (!payment) throw new NotFoundException('Payment not found');
-      fee = await this.feeRepo.findOne({
-        where: { id: payment.feeId, tenantId },
-      });
+      fee = payment.feeId
+        ? await this.feeRepo.findOne({
+            where: { id: payment.feeId, tenantId },
+          })
+        : null;
     } else if (args.feeId) {
       fee = await this.feeRepo.findOne({
         where: { id: args.feeId, tenantId },
@@ -373,7 +375,7 @@ export class ReceiptTemplatesService {
     const fakePayment: Partial<FeePayment> = {
       receiptNumber: 'SVBK-2025-26-0042',
       amount: '23000.00',
-      paymentType: PaymentType.CASH,
+      method: PaymentType.CASH,
       paidAt: new Date(),
     };
     return this.makeContext(
@@ -393,7 +395,7 @@ export class ReceiptTemplatesService {
     const now = new Date();
     const paidAt = payment?.paidAt ?? now;
     const source = payment
-      ? ONLINE_TYPES.has(payment.paymentType)
+      ? payment.method && ONLINE_TYPES.has(payment.method)
         ? 'Gateway'
         : 'Manual record'
       : '';
@@ -455,7 +457,7 @@ export class ReceiptTemplatesService {
             amount: payment.amount ?? '0',
             amountInr: formatINR(Number(payment.amount)),
             amountInWords,
-            paymentType: payment.paymentType ?? '',
+            paymentType: payment.method ?? '',
             source,
             paidAt: paidAt.toISOString(),
             paidAtFormatted: paidAt.toLocaleString('en-IN', {
@@ -552,7 +554,7 @@ export class ReceiptTemplatesService {
 
   /** Source helper for the renderer when deciding which template to pick automatically. */
   static kindForPayment(p: FeePayment): ReceiptTemplateKind {
-    return ONLINE_TYPES.has(p.paymentType)
+    return p.method && ONLINE_TYPES.has(p.method)
       ? ReceiptTemplateKind.ONLINE
       : ReceiptTemplateKind.OFFLINE;
   }

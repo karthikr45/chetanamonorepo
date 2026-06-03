@@ -4,7 +4,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { In, Repository } from 'typeorm';
+import { In, IsNull, Not, Repository } from 'typeorm';
 import { TenantConfig } from '../tenant-configs/entities/tenant-config.entity';
 import { AcademicYear } from '../academic-years/entities/academic-year.entity';
 import { Student } from '../students/entities/student.entity';
@@ -158,10 +158,15 @@ export class PublicPayService {
     const latestReceiptByFee = new Map<string, string>();
     if (fees.length) {
       const payments = await this.feePaymentRepo.find({
-        where: { tenantId: cfg.tenantId, feeId: In(fees.map((f) => f.id)) },
+        where: {
+          tenantId: cfg.tenantId,
+          feeId: In(fees.map((f) => f.id)),
+          receiptNumber: Not(IsNull()),
+        },
         order: { paidAt: 'DESC', createdAt: 'DESC' },
       });
       for (const p of payments) {
+        if (!p.feeId) continue;
         if (!latestReceiptByFee.has(p.feeId)) {
           latestReceiptByFee.set(p.feeId, p.id);
         }

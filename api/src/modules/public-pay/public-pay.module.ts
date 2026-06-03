@@ -4,7 +4,6 @@ import { TenantConfig } from '../tenant-configs/entities/tenant-config.entity';
 import { AcademicYear } from '../academic-years/entities/academic-year.entity';
 import { Student } from '../students/entities/student.entity';
 import { Fee } from '../fees/entities/fee.entity';
-import { FeePayment } from '../fees/entities/fee-payment.entity';
 import { Payment } from '../payments/entities/payment.entity';
 import { PaymentsModule } from '../payments/payments.module';
 import { FeesModule } from '../fees/fees.module';
@@ -18,7 +17,6 @@ import { PublicPayService } from './public-pay.service';
       AcademicYear,
       Student,
       Fee,
-      FeePayment,
       Payment,
     ]),
     PaymentsModule,

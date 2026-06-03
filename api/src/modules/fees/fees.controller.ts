@@ -362,9 +362,9 @@ export class FeesController {
   @ApiOperation({
     summary: 'Mark a cheque / DD as CLEARED or BOUNCED',
     description:
-      'Cheque and DD payments are recorded with clearance_status=PENDING and do not yet add to fee.paid_amount. Mark CLEARED to recognise the payment, or BOUNCED to reject it. CLEARED → BOUNCED reverses a previously-cleared cheque.',
+      'Cheque and DD payments are recorded with clearance_status=PENDING (payments) and do not yet add to fee.paid_amount. Mark CLEARED to recognise the payment, or BOUNCED to reject it. CLEARED → BOUNCED reverses a previously-cleared cheque.',
   })
-  @ApiParam({ name: 'paymentId', description: 'fee_payment UUID' })
+  @ApiParam({ name: 'paymentId', description: 'payment UUID' })
   async updateClearance(
     @Param('paymentId', buildUuidPipe('paymentId')) paymentId: string,
     @Body() dto: UpdateClearanceDto,
@@ -423,7 +423,7 @@ export class FeesController {
   @ApiOperation({
     summary: 'List all payments recorded against a fee',
     description:
-      'Returns every fee_payments row for this fee (online + offline), oldest first. Used for the admin payment-history view and parent receipts.',
+      'Returns every payments row for this fee (online + offline), oldest first. Used for the admin payment-history view and parent receipts.',
   })
   @ApiParam({ name: 'id', description: 'Fee UUID' })
   async listFeePayments(
@@ -458,7 +458,7 @@ export class FeesController {
   @ApiOperation({
     summary: 'List cheque/DD payments awaiting clearance',
     description:
-      'Returns every fee_payments row with clearance_status=PENDING for the current tenant. Use to drive the admin "Pending cheques" view.',
+      'Returns every payments row with clearance_status=PENDING (payments) for the current tenant. Use to drive the admin "Pending cheques" view.',
   })
   async listPendingClearance(@Req() req: Request) {
     const { tenantId } = ctx(req);
@@ -469,9 +469,9 @@ export class FeesController {
   @ApiOperation({
     summary: 'Printable HTML receipt for a payment',
     description:
-      'Returns a self-contained, print-ready HTML receipt for the given fee_payments row. Open and Cmd+P / Ctrl+P to print.',
+      'Returns a self-contained, print-ready HTML receipt for the given payments row. Open and Cmd+P / Ctrl+P to print.',
   })
-  @ApiParam({ name: 'paymentId', description: 'fee_payment UUID' })
+  @ApiParam({ name: 'paymentId', description: 'payment UUID' })
   async receipt(
     @Param('paymentId', buildUuidPipe('paymentId')) paymentId: string,
     @Req() req: Request,
