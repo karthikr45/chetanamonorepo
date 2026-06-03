@@ -157,6 +157,7 @@ export class FeesController {
 
   @Post('discount/add')
   @HttpCode(HttpStatus.OK)
+  @Roles(Role.SUPER_ADMIN, Role.ADMIN, Role.FIN_ADMIN, Role.OPS_ADMIN)
   @ApiOperation({
     summary: 'Add discount in bulk (single, multiple, or all students)',
     description:
@@ -164,7 +165,8 @@ export class FeesController {
       'Use admissionNumbers for selective application (max 500). Use ' +
       'applyToAll=true to apply to every non-PAID fee in scope. Fees where ' +
       'the discount would invalidate an already-posted payment are silently ' +
-      'skipped.',
+      'skipped. Tenant/super admins apply it immediately; fin/ops admins ' +
+      'route through tenant-admin approval.',
   })
   async addDiscountBulk(@Body() dto: BulkAddDiscountDto, @Req() req: Request) {
     const { tenantId } = ctx(req);
@@ -178,6 +180,7 @@ export class FeesController {
 
   @Post('discount/waive')
   @HttpCode(HttpStatus.OK)
+  @Roles(Role.SUPER_ADMIN, Role.ADMIN, Role.FIN_ADMIN, Role.OPS_ADMIN)
   @ApiOperation({
     summary: 'Waive discount in bulk (single, multiple, or all students)',
     description:
@@ -197,10 +200,11 @@ export class FeesController {
 
   @Post(':id/discount')
   @HttpCode(HttpStatus.OK)
+  @Roles(Role.SUPER_ADMIN, Role.ADMIN, Role.FIN_ADMIN, Role.OPS_ADMIN)
   @ApiOperation({
     summary: 'Add discount to a fee',
     description:
-      'Adds to total_discount and recomputes net_amount. Rejected if it would drop net_amount below what has already been paid.',
+      'Adds to total_discount and recomputes net_amount. Rejected if it would drop net_amount below what has already been paid. Tenant/super admins apply it immediately; fin/ops admins route through tenant-admin approval.',
   })
   @ApiParam({ name: 'id', description: 'Fee UUID', example: 'a1b2c3d4-0000-4000-8000-000000000001' })
   async addDiscount(
@@ -264,6 +268,7 @@ export class FeesController {
 
   @Post(':id/discount/waive')
   @HttpCode(HttpStatus.OK)
+  @Roles(Role.SUPER_ADMIN, Role.ADMIN, Role.FIN_ADMIN, Role.OPS_ADMIN)
   @ApiOperation({
     summary: 'Waive discount on a single fee',
     description:
