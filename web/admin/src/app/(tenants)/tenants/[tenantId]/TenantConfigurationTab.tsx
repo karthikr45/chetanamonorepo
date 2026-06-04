@@ -16,10 +16,6 @@ type DeleteDialogState =
   | { open: true; mode: "confirm"; config: SaveTenantConfigPayload }
   | { open: true; mode: "noId" };
 
-function normalizeEnvKey(apiEnvType: string | undefined): string {
-  return (apiEnvType ?? "").trim().toLowerCase().replace(/\s+/g, "");
-}
-
 function pickConfigString(c: SaveTenantConfigPayload, keys: string[]): string {
   const r = c as unknown as Record<string, unknown>;
   for (const k of keys) {
@@ -29,25 +25,11 @@ function pickConfigString(c: SaveTenantConfigPayload, keys: string[]): string {
   return "";
 }
 
-function routeEnvIdForConfig(c: SaveTenantConfigPayload): string {
-  const raw = pickConfigString(c, ["envType", "env_type", "environmentType", "environment"]);
-  const k = normalizeEnvKey(raw);
-  if (k === "qa" || k === "qualityassurance") return "qa";
-  if (k === "production" || k === "prod") return "production";
-  return "development";
-}
-
 function savedConfigCardTitle(c: SaveTenantConfigPayload): string {
   return (
     pickConfigString(c, ["configName", "config_name", "name", "configurationName", "title"]) ||
-    pickConfigString(c, ["envType", "env_type", "environmentType"]) ||
     "Configuration"
   );
-}
-
-function savedConfigCardSubtitle(c: SaveTenantConfigPayload): string {
-  const env = pickConfigString(c, ["envType", "env_type", "environmentType", "environment"]);
-  return env || "Saved for this tenant — open to edit";
 }
 
 type TenantConfigurationTabProps = {
@@ -72,9 +54,8 @@ export default function TenantConfigurationTab({
   const closeDeleteDialog = () => setDeleteDialog({ open: false });
 
   const openConfigEditor = (c: SaveTenantConfigPayload) => {
-    const envId = routeEnvIdForConfig(c);
     const recordId = getTenantConfigRecordId(c);
-    const path = `/tenants/${tenantId}/config/${envId}`;
+    const path = `/tenants/${tenantId}/config/default`;
     router.push(recordId ? `${path}?configId=${encodeURIComponent(recordId)}` : path);
   };
 
@@ -100,10 +81,10 @@ export default function TenantConfigurationTab({
         <div className="mb-4 flex items-end justify-between">
           <div>
             <h2 className="text-lg font-bold tracking-tight text-[var(--app-text-primary)]">
-              Environments
+              Configuration
             </h2>
             <p className="mt-1 text-sm text-[var(--app-text-secondary)]">
-              Each environment holds the storage, payment gateway and SMTP credentials for one stage.
+              Storage, payment gateway and SMTP credentials for this tenant.
             </p>
           </div>
         </div>
@@ -141,24 +122,16 @@ export default function TenantConfigurationTab({
               </svg>
             </div>
             <h3 className="text-base font-semibold text-[var(--app-text-primary)]">
-              No environments yet
+              No configuration yet
             </h3>
             <p className="mt-1 text-sm text-[var(--app-text-secondary)] max-w-sm mx-auto">
-              Click <span className="font-semibold">Add configuration</span> above to create your first environment (Development, QA, or Production).
+              Click <span className="font-semibold">Add configuration</span> above to set up this tenant.
             </p>
           </div>
         )}
         {!loading && configs.length > 0 && (
           <div className="grid gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
             {configs.map((c, idx) => {
-              const env = savedConfigCardSubtitle(c);
-              const envKey = env.toLowerCase();
-              const envBadge =
-                envKey.includes("prod")
-                  ? { bg: "#dcfce7", fg: "#15803d" }
-                  : envKey.includes("qa")
-                  ? { bg: "#fef3c7", fg: "#92400e" }
-                  : { bg: "#e0e7ff", fg: "#3730a3" };
               return (
                 <TenantCard
                   key={getTenantConfigRecordId(c) ?? `${savedConfigCardTitle(c)}-${idx}`}
@@ -167,17 +140,7 @@ export default function TenantConfigurationTab({
                 >
                   <div className="flex items-start justify-between gap-2">
                     <div className="min-w-0 flex-1">
-                      <span
-                        className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-[0.06em]"
-                        style={{ backgroundColor: envBadge.bg, color: envBadge.fg }}
-                      >
-                        <span
-                          className="h-1.5 w-1.5 rounded-full"
-                          style={{ backgroundColor: envBadge.fg }}
-                        />
-                        {env}
-                      </span>
-                      <p className="mt-3 truncate text-[15px] font-bold tracking-tight text-[var(--app-text-primary)]">
+                      <p className="truncate text-[15px] font-bold tracking-tight text-[var(--app-text-primary)]">
                         {savedConfigCardTitle(c)}
                       </p>
                       <p className="mt-1 text-xs text-[var(--app-text-secondary)]">
@@ -243,8 +206,7 @@ export default function TenantConfigurationTab({
         {deleteDialog.open && deleteDialog.mode === "confirm" && (
           <p className="text-sm text-[var(--app-text-secondary)]">
             <span className="font-medium text-[var(--app-text-primary)]">{savedConfigCardTitle(deleteDialog.config)}</span>
-            {" — "}
-            {savedConfigCardSubtitle(deleteDialog.config)} will be removed. This cannot be undone.
+            {" will be removed. This cannot be undone."}
           </p>
         )}
       </Modal>

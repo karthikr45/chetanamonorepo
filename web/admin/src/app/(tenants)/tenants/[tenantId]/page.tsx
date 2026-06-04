@@ -23,7 +23,6 @@ import { listSystemMetadataApi } from "@/features/system-metadata/api/system-met
 import { useMetadata } from "@/features/system-metadata/hooks/useMetadata";
 
 type NewConfig = {
-  envType: string;
   configName: string;
   logoUrl: string;
   receiptLogoUrl: string;
@@ -48,7 +47,6 @@ type NewConfig = {
 };
 
 const emptyConfig: NewConfig = {
-  envType: "",
   configName: "",
   logoUrl: "",
   receiptLogoUrl: "",
@@ -108,12 +106,6 @@ function getNewConfigValidationErrors(cfg: NewConfig): Partial<Record<keyof NewC
   });
   return errs;
 }
-
-const FALLBACK_ENV_TYPE_OPTIONS: SelectMenuOption[] = [
-  { value: "Production", label: "Production" },
-  { value: "QA", label: "QA" },
-  { value: "Development", label: "Development" },
-];
 
 const FALLBACK_GATEWAY_TYPE_OPTIONS: SelectMenuOption[] = [
   { value: "Razorpay", label: "Razorpay" },
@@ -175,20 +167,11 @@ function TenantDetailsPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
 
-  const envMeta = useMetadata("environment_type", {
-    fallback: FALLBACK_ENV_TYPE_OPTIONS.map((o, i) => ({
-      value: o.value, label: o.label, displayOrder: i, isActive: true,
-    })),
-  });
   const gatewayMeta = useMetadata("payment_gateway", {
     fallback: FALLBACK_GATEWAY_TYPE_OPTIONS.map((o, i) => ({
       value: o.value, label: o.label, displayOrder: i, isActive: true,
     })),
   });
-  const ENV_TYPE_OPTIONS: SelectMenuOption[] = envMeta.options.map((o) => ({
-    value: o.value,
-    label: o.label,
-  }));
   const GATEWAY_TYPE_OPTIONS: SelectMenuOption[] = gatewayMeta.options.map((o) => ({
     value: o.value,
     label: o.label,
@@ -415,7 +398,6 @@ function TenantDetailsPageContent() {
     try {
       await saveTenantConfigApi({
         tenantId: String(tenantId ?? ""),
-        envType: newConfig.envType,
         configName: newConfig.configName,
         logoUrl: newConfig.logoUrl,
         receiptLogoUrl: newConfig.receiptLogoUrl,
@@ -547,7 +529,7 @@ function TenantDetailsPageContent() {
           </div>
         </div>
 
-        {activeTab === "configuration" && (
+        {activeTab === "configuration" && tenantConfigs.length === 0 && (
           <Button variant="primary" size="md" onClick={() => setModalOpen(true)}>
             <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
               <path d="M8 3v10M3 8h10" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
@@ -648,19 +630,10 @@ function TenantDetailsPageContent() {
             <legend className="text-sm font-semibold uppercase tracking-wide text-[var(--app-text-secondary)]">
               General
             </legend>
-            <div className="grid min-w-0 gap-4 sm:grid-cols-2">
-              <ModalSelectMenu
-                label="Environment Type"
-                ariaLabel="Environment type"
-                value={newConfig.envType}
-                onChange={(v) => updateNew({ envType: v })}
-                options={ENV_TYPE_OPTIONS}
-                error={newConfigErrors.envType}
-                placeholder="Select environment"
-              />
+            <div className="grid min-w-0 gap-4">
               <Input
                 label="Configuration Name"
-                placeholder="e.g. Production Config"
+                placeholder="e.g. Default Config"
                 value={newConfig.configName}
                 onChange={(e) => updateNew({ configName: e.target.value })}
                 error={newConfigErrors.configName}

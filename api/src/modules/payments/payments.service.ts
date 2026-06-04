@@ -71,8 +71,8 @@ export class PaymentsService {
    * Resolves the gateway credentials for a tenant. Reads the active
    * TenantConfig — refuses to proceed if missing rather than silently
    * falling back to a wrong key. The `mode` flows from the config's
-   * `environment_type` so each tenant can independently go live or
-   * stay piloting on sandbox keys.
+   * `payment_mode` so each tenant can independently go live or stay
+   * piloting on sandbox keys.
    */
   private async credsForTenant(tenantId: string): Promise<GatewayCredentials> {
     const cfg = await this.tenantConfigsService.findActiveForTenant(tenantId);

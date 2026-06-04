@@ -4,7 +4,6 @@ import {
   ConflictException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { ConfigService } from '@nestjs/config';
 import { Repository, DeepPartial } from 'typeorm';
 import {
   EnvironmentType,
@@ -16,7 +15,6 @@ import { UpdateTenantConfigDto } from './dto/update-tenant-config.dto';
 /** Non-secret config surface returned to the parent portal / public pay. */
 export interface PublicTenantConfig {
   tenantId: string;
-  environmentType: EnvironmentType;
   configurationName: string;
   logoUrl: string | null;
   receiptLogoUrl: string | null;
@@ -31,7 +29,6 @@ export class TenantConfigsService {
   constructor(
     @InjectRepository(TenantConfig)
     private readonly repo: Repository<TenantConfig>,
-    private readonly config: ConfigService,
   ) {}
 
   /**
@@ -49,31 +46,10 @@ export class TenantConfigsService {
       .replace(/:\d+$/, '');
   }
 
-  /** Current app environment (from APP_ENV / NODE_ENV) as an EnvironmentType. */
-  private currentEnvironment(): EnvironmentType | null {
-    const raw = (this.config.get<string>('appEnv') ?? '').toLowerCase().trim();
-    const allowed = Object.values(EnvironmentType) as string[];
-    return allowed.includes(raw) ? (raw as EnvironmentType) : null;
-  }
-
-  /**
-   * From a list of candidate configs (expected pre-ordered newest-first),
-   * pick the one matching the running app environment (APP_ENV); otherwise
-   * fall back to the first candidate. The single place every "which config"
-   * decision goes through, so payments, receipts, branding, parent portal
-   * and public pay all resolve the same way.
-   */
-  private pickForEnv(configs: TenantConfig[]): TenantConfig | null {
-    if (!configs.length) return null;
-    const env = this.currentEnvironment();
-    return (env && configs.find((c) => c.environmentType === env)) || configs[0];
-  }
-
   /** The non-secret subset served to the parent portal / public pay. */
   private toPublic(cfg: TenantConfig): PublicTenantConfig {
     return {
       tenantId: cfg.tenantId,
-      environmentType: cfg.environmentType,
       configurationName: cfg.configurationName,
       logoUrl: cfg.logoUrl,
       receiptLogoUrl: cfg.receiptLogoUrl,
@@ -87,10 +63,7 @@ export class TenantConfigsService {
   /**
    * Resolve the non-secret tenant config for a caller's domain. The client
    * passes its `window.location.href`; we match its host against
-   * `domain_url`. When several configs share a domain we prefer the one
-   * whose `environment_type` matches the running app env (APP_ENV), so the
-   * production site gets the production config and QA gets QA. Returns null
-   * if nothing matches.
+   * `domain_url`. Returns null if nothing matches.
    */
   async resolvePublicByUrl(url: string): Promise<PublicTenantConfig | null> {
     const cfg = await this.resolveActiveByHost(url);
@@ -99,7 +72,7 @@ export class TenantConfigsService {
 
   /**
    * Non-secret config for a logged-in user's tenant (parent portal / mobile
-   * parent — no domain available). Env-aware via APP_ENV.
+   * parent — no domain available).
    */
   async resolveByTenant(tenantId: string): Promise<PublicTenantConfig | null> {
     const cfg = await this.findActiveForTenant(tenantId);
@@ -108,9 +81,8 @@ export class TenantConfigsService {
 
   /**
    * Resolve the active config whose domain matches the caller's host
-   * (accepts a full href, Host header, or bare host). Env-aware + newest
-   * first. Returns the full entity for callers that need secrets
-   * (e.g. public-pay gateway keys).
+   * (accepts a full href, Host header, or bare host). Returns the full
+   * entity for callers that need secrets (e.g. public-pay gateway keys).
    */
   async resolveActiveByHost(hostOrUrl: string): Promise<TenantConfig | null> {
     const target = this.normaliseHost(hostOrUrl);
@@ -121,14 +93,16 @@ export class TenantConfigsService {
         order: { createdAt: 'DESC' },
       })
     ).filter((cfg) => this.normaliseHost(cfg.domainUrl) === target);
-    return this.pickForEnv(matches);
+    return matches[0] ?? null;
   }
 
   private toEntity(dto: CreateTenantConfigDto | UpdateTenantConfigDto): DeepPartial<TenantConfig> {
     return {
       tenantId: dto.tenantId,
-      environmentType: dto.envType,
-      configurationName: dto.configName,
+      // Environments were removed — every tenant has a single configuration.
+      // The column is retained but no longer surfaced; default to production.
+      environmentType: dto.envType ?? EnvironmentType.PRODUCTION,
+      configurationName: dto.configName ?? 'default',
       logoUrl: dto.logoUrl,
       receiptLogoUrl: dto.receiptLogoUrl,
       domainUrl: dto.domainUrl,
@@ -159,16 +133,13 @@ export class TenantConfigsService {
   async create(dto: CreateTenantConfigDto): Promise<TenantConfig> {
     const data = this.toEntity(dto);
 
+    // A tenant may have only ONE configuration — reject a second.
     const existing = await this.repo.findOne({
-      where: {
-        tenantId: data.tenantId as string,
-        configurationName: data.configurationName as string,
-      },
+      where: { tenantId: data.tenantId as string },
     });
-
     if (existing) {
       throw new ConflictException(
-        `Configuration "${data.configurationName}" already exists for this tenant.`,
+        'This tenant already has a configuration. Edit the existing one instead.',
       );
     }
 
@@ -188,18 +159,15 @@ export class TenantConfigsService {
   }
 
   /**
-   * The active config for a tenant — env-aware: prefers the one whose
-   * environment_type matches APP_ENV, else the newest active. Used by the
-   * payments flow (gateway credentials), branding, and the parent portal,
-   * so every surface resolves the same config. Returns null if the tenant
-   * has no active config.
+   * The active config for a tenant. A tenant has a single configuration, so
+   * this returns it (newest active if more than one exists on legacy data).
+   * Used by payments (gateway credentials), branding and the parent portal.
    */
   async findActiveForTenant(tenantId: string): Promise<TenantConfig | null> {
-    const configs = await this.repo.find({
+    return this.repo.findOne({
       where: { tenantId, isActive: true },
       order: { createdAt: 'DESC' },
     });
-    return this.pickForEnv(configs);
   }
 
   async findOne(id: string): Promise<TenantConfig> {
@@ -240,11 +208,9 @@ export class TenantConfigsService {
   async upsert(dto: CreateTenantConfigDto): Promise<TenantConfig> {
     const data = this.toEntity(dto);
 
+    // Single config per tenant — update the existing one if present.
     const existing = await this.repo.findOne({
-      where: {
-        tenantId: data.tenantId as string,
-        configurationName: data.configurationName as string,
-      },
+      where: { tenantId: data.tenantId as string },
     });
 
     if (existing) {

@@ -13,9 +13,8 @@ import { TenantConfigsService } from '../tenant-configs/tenant-configs.service';
  * Login-free parent-portal config surface. Used by both the authenticated
  * portal and the public parent-pay page: the client passes its
  * `window.location.href`, the server resolves the matching tenant config by
- * domain (preferring the config whose environment_type matches APP_ENV) and
- * returns the non-secret display config — branding + privacy / terms /
- * refund policy URLs.
+ * domain and returns the non-secret display config — branding + privacy /
+ * terms / refund policy URLs.
  *
  * Intentionally public (no auth) so the public pay page can render the
  * policy links before any login.
@@ -33,8 +32,7 @@ export class ParentPortalPublicController {
     description:
       'Pass the browser `window.location.href` as `url`. The server matches ' +
       'its host against tenant_configurations.domain_url and returns the ' +
-      'config for the running app environment (APP_ENV). No secrets are ' +
-      'returned.',
+      'tenant config. No secrets are returned.',
   })
   async config(@Query('url') url: string) {
     if (!url?.trim()) {

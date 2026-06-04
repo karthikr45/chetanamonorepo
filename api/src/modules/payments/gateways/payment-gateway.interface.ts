@@ -36,7 +36,7 @@ export interface GatewayCredentials {
   secretKey: string;
   /**
    * Sandbox or production — driven by the active TenantConfig's
-   * environment_type. Lets one school go live while another keeps
+   * payment_mode. Lets one school go live while another keeps
    * piloting on test keys; no env var coordination required.
    */
   mode: 'sandbox' | 'production';

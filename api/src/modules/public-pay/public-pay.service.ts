@@ -55,10 +55,10 @@ export class PublicPayService {
 
   /**
    * Resolve the tenant config whose configured domainUrl matches the
-   * caller's Host. Delegates to TenantConfigsService so it's env-aware
-   * (prefers the APP_ENV config) and consistent with the rest of the app.
-   * Returns null when nothing matches — the controller turns that into a
-   * 404 with a generic message (don't leak which hosts are valid).
+   * caller's Host. Delegates to TenantConfigsService, consistent with the
+   * rest of the app. Returns null when nothing matches — the controller
+   * turns that into a 404 with a generic message (don't leak which hosts
+   * are valid).
    */
   private resolveConfigByHost(host: string): Promise<TenantConfig | null> {
     return this.tenantConfigsService.resolveActiveByHost(host);

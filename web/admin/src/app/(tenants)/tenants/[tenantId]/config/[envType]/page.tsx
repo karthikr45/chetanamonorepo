@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { ConfigSection } from "@/components/common";
 import { Button, Input } from "@/components/ui";
@@ -18,9 +18,8 @@ import { useMetadata } from "@/features/system-metadata/hooks/useMetadata";
 /** Form model matches API config fields (tenant id is tracked separately on the page). */
 type TenantConfigForm = Omit<TenantConfigPayload, "tenantId">;
 
-function emptyTenantConfigForm(envTypeLabel: string): TenantConfigForm {
+function emptyTenantConfigForm(): TenantConfigForm {
   return {
-    envType: envTypeLabel,
     configName: "",
     logoUrl: "",
     receiptLogoUrl: "",
@@ -49,7 +48,6 @@ function serverConfigToForm(row: SaveTenantConfigPayload): TenantConfigForm {
   const storageTab =
     row.storageTab === "connectionString" ? "connectionString" : "accessKeys";
   return {
-    envType: row.envType ?? "",
     configName: row.configName ?? "",
     logoUrl: row.logoUrl ?? "",
     receiptLogoUrl: row.receiptLogoUrl ?? "",
@@ -74,43 +72,13 @@ function serverConfigToForm(row: SaveTenantConfigPayload): TenantConfigForm {
   };
 }
 
-/** Display label for env saved to the API; must match route segment intent. */
-function envTypeLabelFromRouteParam(routeEnv: string | undefined): string {
-  const k = (routeEnv ?? "").toLowerCase();
-  if (k === "production") return "Production";
-  if (k === "qa") return "QA";
-  return "Development";
-}
-
-function envKeyFromApiEnvType(apiEnvType: string | undefined): string {
-  return (apiEnvType ?? "").trim().toLowerCase().replace(/\s+/g, "");
-}
-
-function rowMatchesRouteEnv(row: SaveTenantConfigPayload, routeEnvKey: string): boolean {
-  const raw = row.envType ?? "";
-  const k = envKeyFromApiEnvType(raw);
-  if (routeEnvKey === "production") return k === "production" || raw.toLowerCase() === "production";
-  if (routeEnvKey === "qa") return k === "qa" || raw.toLowerCase() === "qa";
-  return k === "development" || k === "dev" || raw.toLowerCase() === "development";
-}
-
 export default function EnvConfigPage() {
-  const { tenantId, envType } = useParams<{ tenantId: string; envType: string }>();
+  const { tenantId } = useParams<{ tenantId: string }>();
   const router = useRouter();
   const searchParams = useSearchParams();
   const resolvedTenantId = Array.isArray(tenantId) ? tenantId[0] : tenantId;
-  const resolvedEnvParam = Array.isArray(envType) ? envType[0] : envType;
   const configIdFromQuery = searchParams.get("configId")?.trim() || undefined;
 
-  // Metadata-driven dropdown options. Falls back to a single sensible
-  // value if the API is reachable but the type hasn't been seeded yet.
-  const envMeta = useMetadata("environment_type", {
-    fallback: [
-      { value: "Production", label: "Production", displayOrder: 1, isActive: true },
-      { value: "QA", label: "QA", displayOrder: 2, isActive: true },
-      { value: "Development", label: "Development", displayOrder: 3, isActive: true },
-    ],
-  });
   const gatewayMeta = useMetadata("payment_gateway", {
     fallback: [
       { value: "Razorpay", label: "Razorpay", displayOrder: 1, isActive: true },
@@ -126,9 +94,7 @@ export default function EnvConfigPage() {
     router.push("/tenants");
   };
 
-  const routeEnvTypeLabel = useMemo(() => envTypeLabelFromRouteParam(resolvedEnvParam), [resolvedEnvParam]);
-
-  const [config, setConfig] = useState<TenantConfigForm>(() => emptyTenantConfigForm(routeEnvTypeLabel));
+  const [config, setConfig] = useState<TenantConfigForm>(() => emptyTenantConfigForm());
   const [configRecordId, setConfigRecordId] = useState<string | undefined>(undefined);
   const [errors, setErrors] = useState<Partial<Record<keyof TenantConfigForm, string>>>({});
   const [showSuccess, setShowSuccess] = useState("");
@@ -154,7 +120,7 @@ export default function EnvConfigPage() {
     setConfigLoadError(null);
 
     (async () => {
-      const fallbackForm = emptyTenantConfigForm(routeEnvTypeLabel);
+      const fallbackForm = emptyTenantConfigForm();
 
       try {
         let row: SaveTenantConfigPayload | null = null;
@@ -168,16 +134,14 @@ export default function EnvConfigPage() {
         }
 
         if (!row) {
+          // Single config per tenant — take it (matching the id when present).
           const list = await getTenantConfigsByTenantIdApi(tid);
-          const routeKey = (resolvedEnvParam ?? "").toLowerCase();
-          if (configIdFromQuery) {
-            row =
-              list.find((r) => getTenantConfigRecordId(r) === configIdFromQuery) ??
-              list.find((r) => rowMatchesRouteEnv(r, routeKey)) ??
-              null;
-          } else {
-            row = list.find((r) => rowMatchesRouteEnv(r, routeKey)) ?? null;
-          }
+          row =
+            (configIdFromQuery
+              ? list.find((r) => getTenantConfigRecordId(r) === configIdFromQuery)
+              : undefined) ??
+            list[0] ??
+            null;
         }
 
         if (cancelled) return;
@@ -203,7 +167,7 @@ export default function EnvConfigPage() {
     return () => {
       cancelled = true;
     };
-  }, [resolvedTenantId, resolvedEnvParam, routeEnvTypeLabel, configIdFromQuery]);
+  }, [resolvedTenantId, configIdFromQuery]);
 
   const updateConfig = (updates: Partial<TenantConfigForm>) =>
     setConfig((prev) => ({ ...prev, ...updates }));
@@ -260,7 +224,6 @@ export default function EnvConfigPage() {
 
     const payload: SaveTenantConfigPayload = {
       tenantId: String(resolvedTenantId ?? ""),
-      envType: config.envType,
       configName: config.configName,
       logoUrl: config.logoUrl,
       receiptLogoUrl: config.receiptLogoUrl,
@@ -292,8 +255,7 @@ export default function EnvConfigPage() {
           if (refreshed) setConfig(serverConfigToForm(refreshed));
         } else {
           const list = await getTenantConfigsByTenantIdApi(tid);
-          const routeKey = (resolvedEnvParam ?? "").toLowerCase();
-          const match = list.find((r) => rowMatchesRouteEnv(r, routeKey));
+          const match = list[0];
           if (match) {
             setConfigRecordId(getTenantConfigRecordId(match));
             setConfig(serverConfigToForm(match));
@@ -317,7 +279,6 @@ export default function EnvConfigPage() {
     }
   };
 
-  const envLabel = routeEnvTypeLabel;
   const isEditingConfig = Boolean(configRecordId || configIdFromQuery);
 
   return (
@@ -335,10 +296,10 @@ export default function EnvConfigPage() {
           </Button>
           <div className="min-w-0 flex-1">
             <h1 className="text-2xl font-bold text-[var(--app-text-primary)]">
-              {envLabel} Configuration
+              Configuration
             </h1>
             <p className="mt-1 text-sm text-[var(--app-text-secondary)]">
-              Manage settings for the {envLabel} environment
+              Manage settings for this tenant
             </p>
           </div>
         </div>
@@ -359,27 +320,6 @@ export default function EnvConfigPage() {
         onSubmit={(e) => e.preventDefault()}
       >
         <ConfigSection title="General">
-          <div className="flex flex-col gap-1">
-            <label className="text-sm font-medium text-[var(--app-text-secondary)]">
-              Environment Type
-            </label>
-            <select
-              value={config.envType}
-              onChange={(e) => updateConfig({ envType: e.target.value })}
-              disabled
-              title="Environment is set by the page you opened and cannot be changed here."
-              className="h-11 cursor-not-allowed rounded-lg border border-zinc-300 bg-zinc-100 px-3 text-base text-zinc-600 opacity-90 dark:border-zinc-600 dark:bg-zinc-800/80 dark:text-zinc-300"
-            >
-              <option value="">Select environment</option>
-              {envMeta.options.map((o) => (
-                <option key={o.value} value={o.value}>
-                  {o.label}
-                </option>
-              ))}
-            </select>
-            {errors.envType && <p className="text-sm text-red-600">{errors.envType}</p>}
-          </div>
-
           <Input
             label="Configuration Name"
             value={config.configName}

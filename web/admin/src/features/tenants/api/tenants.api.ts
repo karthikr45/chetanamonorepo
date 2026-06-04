@@ -11,7 +11,6 @@ export type SaveTenantPayload = Omit<Tenant, "id">;
 
 export type TenantConfig = {
   tenantId: string;
-  envType: string;
   configName: string;
   logoUrl: string;
   receiptLogoUrl: string;
@@ -100,16 +99,6 @@ function pickStr(r: Record<string, unknown>, keys: string[]): string {
   return "";
 }
 
-/** Align API env values with UI route / select labels. */
-function formatEnvTypeLabel(raw: string): string {
-  const k = raw.trim().toLowerCase();
-  if (k === "production") return "Production";
-  if (k === "qa") return "QA";
-  if (k === "development" || k === "dev") return "Development";
-  if (!raw.trim()) return "";
-  return raw.charAt(0).toUpperCase() + raw.slice(1).toLowerCase();
-}
-
 function formatGatewayLabel(raw: string): string {
   const k = raw.trim().toLowerCase();
   if (k === "razorpay") return "Razorpay";
@@ -140,13 +129,11 @@ function mapRemoteTenantConfigToPayload(row: unknown): SaveTenantConfigPayload {
   const idRaw = r.id ?? r.configId;
   const id = idRaw != null && String(idRaw).trim() ? String(idRaw).trim() : undefined;
 
-  const envRaw = pickStr(r, ["environmentType", "envType", "env_type", "environment"]);
   const gatewayRaw = pickStr(r, ["gatewayType", "gateway_type"]);
 
   return {
     ...(id ? { id } : {}),
     tenantId: pickStr(r, ["tenantId", "tenant_id"]),
-    envType: formatEnvTypeLabel(envRaw),
     configName: pickStr(r, ["configurationName", "configName", "config_name", "name", "configuration_name"]),
     logoUrl: pickStr(r, ["logoUrl", "logo_url"]),
     receiptLogoUrl: pickStr(r, ["receiptLogoUrl", "receipt_logo_url"]),
@@ -190,12 +177,11 @@ export function normalizeTenantConfigsResponse(data: unknown): SaveTenantConfigP
     const nested = o.data ?? o.configs ?? o.result ?? o.items ?? o.records ?? o.payload ?? o.list;
     if (Array.isArray(nested)) list = nested;
     else if (nested && typeof nested === "object") list = [nested];
-    else if (typeof o.envType === "string" || typeof o.env_type === "string") list = [o];
     else if (
-      typeof o.environmentType === "string" ||
-      typeof o.environment_type === "string" ||
       typeof o.configurationName === "string" ||
-      typeof o.configuration_name === "string"
+      typeof o.configuration_name === "string" ||
+      typeof o.configName === "string" ||
+      typeof o.config_name === "string"
     )
       list = [o];
   }

@@ -25,7 +25,7 @@ export class CashfreeGateway implements IPaymentGateway {
       );
     }
     // Sandbox vs production comes from the tenant's active
-    // TenantConfig (environment_type) — propagated via creds.mode.
+    // TenantConfig (payment_mode) — propagated via creds.mode.
     // No env-var coordination needed; each school chooses independently.
     const env =
       creds.mode === 'production'

@@ -79,7 +79,7 @@ export class ParentPortalService {
   /**
    * Non-secret tenant config (branding + privacy/terms/refund URLs) for the
    * logged-in parent's tenant. Used by the web and mobile parent apps, which
-   * have no domain to match — resolved by tenantId, env-aware (APP_ENV).
+   * have no domain to match — resolved by tenantId.
    */
   portalConfig(tenantId: string) {
     return this.tenantConfigsService.resolveByTenant(tenantId);
