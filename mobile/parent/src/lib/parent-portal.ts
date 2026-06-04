@@ -200,6 +200,29 @@ export async function fetchPaymentHistory(): Promise<PaymentHistoryResponse> {
   return unwrap<PaymentHistoryResponse>(data);
 }
 
+// ── Tenant config (branding + legal links) for the logged-in parent ──
+export interface PortalConfig {
+  tenantId: string;
+  environmentType: string;
+  configurationName: string;
+  logoUrl: string | null;
+  receiptLogoUrl: string | null;
+  domainUrl: string | null;
+  privacyPolicyUrl: string | null;
+  termsAndConditionsUrl: string | null;
+  refundPolicyUrl: string | null;
+}
+
+/**
+ * Non-secret config for the logged-in parent's tenant — branding + the
+ * privacy / terms / refund policy URLs. Resolved by tenantId on the server
+ * (env-aware via APP_ENV), so it works without a domain on mobile.
+ */
+export async function fetchPortalConfig(): Promise<PortalConfig | null> {
+  const { data } = await api.get("/parent/portal-config");
+  return unwrap<PortalConfig | null>(data);
+}
+
 export interface FeedPost {
   id: string;
   title: string | null;

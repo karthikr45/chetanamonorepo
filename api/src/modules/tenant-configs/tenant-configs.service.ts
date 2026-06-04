@@ -57,6 +57,34 @@ export class TenantConfigsService {
   }
 
   /**
+   * From a list of candidate configs (expected pre-ordered newest-first),
+   * pick the one matching the running app environment (APP_ENV); otherwise
+   * fall back to the first candidate. The single place every "which config"
+   * decision goes through, so payments, receipts, branding, parent portal
+   * and public pay all resolve the same way.
+   */
+  private pickForEnv(configs: TenantConfig[]): TenantConfig | null {
+    if (!configs.length) return null;
+    const env = this.currentEnvironment();
+    return (env && configs.find((c) => c.environmentType === env)) || configs[0];
+  }
+
+  /** The non-secret subset served to the parent portal / public pay. */
+  private toPublic(cfg: TenantConfig): PublicTenantConfig {
+    return {
+      tenantId: cfg.tenantId,
+      environmentType: cfg.environmentType,
+      configurationName: cfg.configurationName,
+      logoUrl: cfg.logoUrl,
+      receiptLogoUrl: cfg.receiptLogoUrl,
+      domainUrl: cfg.domainUrl,
+      privacyPolicyUrl: cfg.privacyPolicyUrl,
+      termsAndConditionsUrl: cfg.termsAndConditionsUrl,
+      refundPolicyUrl: cfg.refundPolicyUrl,
+    };
+  }
+
+  /**
    * Resolve the non-secret tenant config for a caller's domain. The client
    * passes its `window.location.href`; we match its host against
    * `domain_url`. When several configs share a domain we prefer the one
@@ -65,34 +93,35 @@ export class TenantConfigsService {
    * if nothing matches.
    */
   async resolvePublicByUrl(url: string): Promise<PublicTenantConfig | null> {
-    const target = this.normaliseHost(url);
-    if (!target) return null;
+    const cfg = await this.resolveActiveByHost(url);
+    return cfg ? this.toPublic(cfg) : null;
+  }
 
-    // Newest active config first, so both the env-match and the fallback
-    // are deterministic when a tenant has several configs on one domain.
+  /**
+   * Non-secret config for a logged-in user's tenant (parent portal / mobile
+   * parent — no domain available). Env-aware via APP_ENV.
+   */
+  async resolveByTenant(tenantId: string): Promise<PublicTenantConfig | null> {
+    const cfg = await this.findActiveForTenant(tenantId);
+    return cfg ? this.toPublic(cfg) : null;
+  }
+
+  /**
+   * Resolve the active config whose domain matches the caller's host
+   * (accepts a full href, Host header, or bare host). Env-aware + newest
+   * first. Returns the full entity for callers that need secrets
+   * (e.g. public-pay gateway keys).
+   */
+  async resolveActiveByHost(hostOrUrl: string): Promise<TenantConfig | null> {
+    const target = this.normaliseHost(hostOrUrl);
+    if (!target) return null;
     const matches = (
       await this.repo.find({
         where: { isActive: true },
         order: { createdAt: 'DESC' },
       })
     ).filter((cfg) => this.normaliseHost(cfg.domainUrl) === target);
-    if (!matches.length) return null;
-
-    const env = this.currentEnvironment();
-    const chosen =
-      (env && matches.find((c) => c.environmentType === env)) ?? matches[0];
-
-    return {
-      tenantId: chosen.tenantId,
-      environmentType: chosen.environmentType,
-      configurationName: chosen.configurationName,
-      logoUrl: chosen.logoUrl,
-      receiptLogoUrl: chosen.receiptLogoUrl,
-      domainUrl: chosen.domainUrl,
-      privacyPolicyUrl: chosen.privacyPolicyUrl,
-      termsAndConditionsUrl: chosen.termsAndConditionsUrl,
-      refundPolicyUrl: chosen.refundPolicyUrl,
-    };
+    return this.pickForEnv(matches);
   }
 
   private toEntity(dto: CreateTenantConfigDto | UpdateTenantConfigDto): DeepPartial<TenantConfig> {
@@ -159,16 +188,18 @@ export class TenantConfigsService {
   }
 
   /**
-   * Returns the most recent active config for a tenant, used by the
-   * payments flow to pick the right gateway credentials. Returns null
-   * if the tenant has no active config (caller decides whether to fall
-   * back to platform defaults or refuse the operation).
+   * The active config for a tenant — env-aware: prefers the one whose
+   * environment_type matches APP_ENV, else the newest active. Used by the
+   * payments flow (gateway credentials), branding, and the parent portal,
+   * so every surface resolves the same config. Returns null if the tenant
+   * has no active config.
    */
   async findActiveForTenant(tenantId: string): Promise<TenantConfig | null> {
-    return this.repo.findOne({
+    const configs = await this.repo.find({
       where: { tenantId, isActive: true },
       order: { createdAt: 'DESC' },
     });
+    return this.pickForEnv(configs);
   }
 
   async findOne(id: string): Promise<TenantConfig> {

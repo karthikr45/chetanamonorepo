@@ -3,6 +3,7 @@ import { useRouter } from "expo-router";
 import {
   ActivityIndicator,
   FlatList,
+  Linking,
   Pressable,
   RefreshControl,
   Text,
@@ -10,8 +11,10 @@ import {
 } from "react-native";
 import {
   fetchDashboard,
+  fetchPortalConfig,
   logout,
   type DashboardResponse,
+  type PortalConfig,
 } from "../src/lib/parent-portal";
 import { apiErrorMessage } from "../src/lib/api";
 
@@ -25,6 +28,7 @@ const inr = (n: number) =>
 export default function DashboardScreen() {
   const router = useRouter();
   const [data, setData] = useState<DashboardResponse | null>(null);
+  const [config, setConfig] = useState<PortalConfig | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -38,6 +42,10 @@ export default function DashboardScreen() {
     } finally {
       setLoading(false);
     }
+    // Branding / legal links — non-blocking; ignore failures.
+    fetchPortalConfig()
+      .then(setConfig)
+      .catch(() => undefined);
   }
 
   useEffect(() => {
@@ -199,7 +207,40 @@ export default function DashboardScreen() {
             </Text>
           ) : null
         }
+        ListFooterComponent={<LegalLinks config={config} />}
       />
+    </View>
+  );
+}
+
+function LegalLinks({ config }: { config: PortalConfig | null }) {
+  if (!config) return null;
+  const links: { label: string; url: string }[] = [
+    { label: "Privacy Policy", url: config.privacyPolicyUrl ?? "" },
+    { label: "Terms & Conditions", url: config.termsAndConditionsUrl ?? "" },
+    { label: "Refund Policy", url: config.refundPolicyUrl ?? "" },
+  ].filter((l) => l.url.trim().length > 0);
+  if (!links.length) return null;
+  return (
+    <View
+      style={{
+        marginTop: 16,
+        paddingTop: 14,
+        borderTopWidth: 1,
+        borderTopColor: "#e2e8f0",
+        flexDirection: "row",
+        flexWrap: "wrap",
+        justifyContent: "center",
+        gap: 16,
+      }}
+    >
+      {links.map((l) => (
+        <Pressable key={l.label} onPress={() => Linking.openURL(l.url)}>
+          <Text style={{ color: "#6c739c", fontSize: 12, fontWeight: "600" }}>
+            {l.label}
+          </Text>
+        </Pressable>
+      ))}
     </View>
   );
 }

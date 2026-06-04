@@ -76,6 +76,15 @@ export class ParentPortalService {
     @InjectDataSource() private readonly dataSource: DataSource,
   ) {}
 
+  /**
+   * Non-secret tenant config (branding + privacy/terms/refund URLs) for the
+   * logged-in parent's tenant. Used by the web and mobile parent apps, which
+   * have no domain to match — resolved by tenantId, env-aware (APP_ENV).
+   */
+  portalConfig(tenantId: string) {
+    return this.tenantConfigsService.resolveByTenant(tenantId);
+  }
+
   async me(tenantId: string, parentId: string) {
     const parent = await this.parentsService.findOneOrFail(tenantId, parentId);
     return {

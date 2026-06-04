@@ -13,6 +13,7 @@ import { Payment, PaymentGateway, PaymentType } from '../payments/entities/payme
 import { FeePayment } from '../fees/entities/fee-payment.entity';
 import { PaymentsService } from '../payments/payments.service';
 import { ReceiptStorageService } from '../fees/receipt-storage.service';
+import { TenantConfigsService } from '../tenant-configs/tenant-configs.service';
 import { PublicInitiateDto, PublicVerifyDto } from './dto/public-pay.dto';
 
 @Injectable()
@@ -32,6 +33,7 @@ export class PublicPayService {
     private readonly feePaymentRepo: Repository<FeePayment>,
     private readonly paymentsService: PaymentsService,
     private readonly receiptStorage: ReceiptStorageService,
+    private readonly tenantConfigsService: TenantConfigsService,
   ) {}
 
   /**
@@ -52,35 +54,14 @@ export class PublicPayService {
   }
 
   /**
-   * Strip protocol, port and trailing slash so a configured domainUrl of
-   * `https://pay.school.com/` matches a Host header of `pay.school.com`.
-   */
-  private normaliseHost(value: string | null | undefined): string {
-    if (!value) return '';
-    return value
-      .trim()
-      .toLowerCase()
-      .replace(/^https?:\/\//, '')
-      .replace(/\/.*$/, '')
-      .replace(/:\d+$/, '');
-  }
-
-  /**
    * Resolve the tenant config whose configured domainUrl matches the
-   * caller's Host. Returns null when nothing matches — the controller
-   * turns that into a 404 with a generic message (don't leak which
-   * hosts are valid).
+   * caller's Host. Delegates to TenantConfigsService so it's env-aware
+   * (prefers the APP_ENV config) and consistent with the rest of the app.
+   * Returns null when nothing matches — the controller turns that into a
+   * 404 with a generic message (don't leak which hosts are valid).
    */
-  private async resolveConfigByHost(host: string): Promise<TenantConfig | null> {
-    const target = this.normaliseHost(host);
-    if (!target) return null;
-    const candidates = await this.cfgRepo.find({
-      where: { isActive: true },
-    });
-    for (const cfg of candidates) {
-      if (this.normaliseHost(cfg.domainUrl) === target) return cfg;
-    }
-    return null;
+  private resolveConfigByHost(host: string): Promise<TenantConfig | null> {
+    return this.tenantConfigsService.resolveActiveByHost(host);
   }
 
   /**

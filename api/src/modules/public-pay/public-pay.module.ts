@@ -7,6 +7,7 @@ import { Fee } from '../fees/entities/fee.entity';
 import { Payment } from '../payments/entities/payment.entity';
 import { PaymentsModule } from '../payments/payments.module';
 import { FeesModule } from '../fees/fees.module';
+import { TenantConfigsModule } from '../tenant-configs/tenant-configs.module';
 import { PublicPayController } from './public-pay.controller';
 import { PublicPayService } from './public-pay.service';
 
@@ -21,6 +22,7 @@ import { PublicPayService } from './public-pay.service';
     ]),
     PaymentsModule,
     FeesModule,
+    TenantConfigsModule,
   ],
   controllers: [PublicPayController],
   providers: [PublicPayService],

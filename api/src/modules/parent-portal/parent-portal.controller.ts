@@ -31,6 +31,16 @@ export class ParentPortalController {
     return this.portal.me(user.tenantId, user.userId);
   }
 
+  @Get('portal-config')
+  @ApiOperation({
+    summary:
+      "Branding + privacy/terms/refund URLs for the logged-in parent's tenant " +
+      '(env-aware; used by web & mobile parent apps)',
+  })
+  portalConfig(@CurrentUser() user: any) {
+    return this.portal.portalConfig(user.tenantId);
+  }
+
   @Get('students')
   @ApiOperation({ summary: 'List of children for the logged-in parent' })
   students(@CurrentUser() user: any) {
