@@ -1,135 +1,143 @@
 "use client";
 
-import { getNotifications } from "@/features/notifications/service/notification.service";
-import { formatDate, getStatusStyles, timeAgo } from "@/lib/utils";
-import { useEffect, useState } from "react";
+import { useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
+import { timeAgo } from "@/lib/utils";
+import { useNotifications } from "@/features/notifications/hooks/useNotifications";
+import { notificationTypeMeta, type NotificationItem } from "@/features/notifications/types";
 
-const TABS = [
-  { id: "template", label: "Template" },
-  { id: "discount", label: "Discount" },
-] as const;
+type TabId = "all" | "unread" | "approval" | "template" | "announcement" | "chat";
 
-type TabId = (typeof TABS)[number]["id"];
+const TABS: { id: TabId; label: string }[] = [
+  { id: "all", label: "All" },
+  { id: "unread", label: "Unread" },
+  { id: "approval", label: "Approvals" },
+  { id: "template", label: "Templates" },
+  { id: "announcement", label: "Announcements" },
+  { id: "chat", label: "Messages" },
+];
 
-const Notifications = () => {
-  const [activeTab, setActiveTab] = useState<TabId>("template");
-  const [notificationData, setNotificationData] = useState<any>(null);
-  const [loading, setLoading] = useState(false);
+export default function NotificationsPage() {
+  const router = useRouter();
+  const { items, unreadCount, loading, error, markRead, markAllRead } = useNotifications();
+  const [tab, setTab] = useState<TabId>("all");
 
-  useEffect(() => {
-    const fetchNotifications = async () => {
-      setLoading(true);
-      try {
-        // const branch = "hyd";
-        // const role = "Admin";
-        const branch = localStorage.getItem("branch") ? "hyd" : "hyd";
-        const role = localStorage.getItem("role") ? "Admin" : "Admin";
+  const filtered = useMemo(() => {
+    if (tab === "all") return items;
+    if (tab === "unread") return items.filter((n) => !n.isRead);
+    return items.filter((n) => n.type === tab);
+  }, [items, tab]);
 
-        const response = await getNotifications(role, branch);
-        setNotificationData(response);
-      } catch {
-      } finally {
-        setLoading(false);
-      }
-    };
+  function open(n: NotificationItem) {
+    void markRead(n.id);
+    if (n.linkUrl) router.push(n.linkUrl);
+  }
 
-    fetchNotifications();
-  }, []);
-
-  // ✅ Filter notifications based on tab
-  const filteredNotifications =
-    notificationData?.notifications?.filter((n: any) => {
-      if (activeTab === "template") return n.type === "templateApproval";
-      if (activeTab === "discount") return n.type === "discountApproval";
-      return true;
-    }) || [];
   return (
     <div className="flex flex-col gap-4 p-4">
-      {/* 🔹 Tabs */}
-      <div
-        className="flex items-center gap-1 rounded-xl border p-1"
-        style={{
-          backgroundColor: "#f3f4f6",
-          borderColor: "var(--app-divider)",
-        }}
-      >
-        {TABS.map(({ id, label }) => (
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-xl font-bold tracking-tight text-[var(--app-text-primary)]">
+            Notifications
+          </h1>
+          <p className="text-sm text-[var(--app-text-secondary)]">
+            {unreadCount > 0 ? `${unreadCount} unread` : "You're all caught up."}
+          </p>
+        </div>
+        {unreadCount > 0 && (
           <button
-            key={id}
             type="button"
-            onClick={() => setActiveTab(id)}
-            className={`relative rounded-lg px-5 py-2 text-sm font-medium transition-all duration-200 w-1/2 ${
-              activeTab === id
-                ? "shadow-sm"
-                : "hover:bg-[var(--app-nav-hover-bg)]"
-            }`}
-            style={
-              activeTab === id
-                ? {
-                    backgroundColor: "var(--app-card-bg)",
-                    color: "var(--app-text-primary)",
-                  }
-                : { color: "var(--app-text-secondary)" }
-            }
+            onClick={() => void markAllRead()}
+            className="rounded-lg border px-3 py-1.5 text-sm font-semibold text-[var(--app-brand)] transition-colors hover:bg-slate-50"
+            style={{ borderColor: "var(--app-card-border)" }}
           >
-            {label}
+            Mark all read
           </button>
-        ))}
+        )}
       </div>
 
-      {/* 🔹 Content */}
-      <div className="space-y-3">
-        {loading && <p className="text-center text-gray-500">Loading...</p>}
+      {/* Tabs */}
+      <div className="flex flex-wrap gap-1 rounded-xl border p-1" style={{ backgroundColor: "#f3f4f6", borderColor: "var(--app-divider)" }}>
+        {TABS.map(({ id, label }) => {
+          const count =
+            id === "unread"
+              ? unreadCount
+              : id === "all"
+                ? items.length
+                : items.filter((n) => n.type === id).length;
+          return (
+            <button
+              key={id}
+              type="button"
+              onClick={() => setTab(id)}
+              className="rounded-lg px-4 py-2 text-sm font-medium transition-all"
+              style={
+                tab === id
+                  ? { backgroundColor: "var(--app-card-bg)", color: "var(--app-text-primary)" }
+                  : { color: "var(--app-text-secondary)" }
+              }
+            >
+              {label}
+              {count > 0 && <span className="ml-1.5 text-xs text-slate-400">{count}</span>}
+            </button>
+          );
+        })}
+      </div>
 
-        {!loading && filteredNotifications?.length === 0 && (
-          <p className="text-center text-gray-400">No notifications found</p>
+      {error && (
+        <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2.5 text-sm text-red-700">
+          {error}
+        </div>
+      )}
+
+      <div className="space-y-2">
+        {loading && items.length === 0 && (
+          <p className="py-8 text-center text-sm text-slate-400">Loading…</p>
+        )}
+        {!loading && filtered.length === 0 && (
+          <p className="py-12 text-center text-sm text-slate-400">No notifications here.</p>
         )}
 
-        {filteredNotifications?.map((notification: any, index: number) => (
-          <div
-            key={index}
-            className="rounded-xl border bg-white p-4 shadow-sm hover:shadow-md transition"
-          >
-            {notification?.type === "templateApproval" && (
-              <>
-                <div className="flex justify-between">
-                  <div>
-                    <h3 className="font-semibold text-gray-800">
-                      {notification?.templateDetails?.title}
-                    </h3>
-
-                    <p className="text-sm text-gray-600 mt-1">
-                      {notification?.templateDetails?.message}
-                    </p>
-                  </div>
-                  {/* <p>{timeAgo(notification.date)}</p> */}
-                  <p className="text-sm text-gray-600 mt-1">{formatDate(notification.date)}</p>
+        {filtered.map((n) => {
+          const meta = notificationTypeMeta(n.type);
+          return (
+            <button
+              key={n.id}
+              type="button"
+              onClick={() => open(n)}
+              className="flex w-full gap-3 rounded-xl border bg-white p-4 text-left shadow-sm transition hover:shadow-md"
+              style={{
+                borderColor: "var(--app-card-border)",
+                backgroundColor: n.isRead ? undefined : "rgba(99,102,241,0.04)",
+              }}
+            >
+              <span
+                className="mt-0.5 inline-flex h-fit flex-shrink-0 items-center rounded-md px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide"
+                style={{ backgroundColor: meta.bg, color: meta.color }}
+              >
+                {meta.label}
+              </span>
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-2">
+                  <h3 className="truncate font-semibold text-[var(--app-text-primary)]">
+                    {n.title}
+                  </h3>
+                  {!n.isRead && <span className="h-1.5 w-1.5 flex-shrink-0 rounded-full bg-[var(--app-brand)]" />}
                 </div>
-
-                <div className="flex justify-between mt-3 text-xs text-gray-500">
-                  <span
-                    className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusStyles(
-                      notification.templateDetails?.status,
-                    )}`}
-                  >
-                    {notification.templateDetails?.status}
-                  </span>
-
-                  <span>{notification?.templateDetails?.branch}</span>
-                </div>
-              </>
-            )}
-
-            {notification.type === "discountApproval" && (
-              <p className="text-sm text-gray-600 mt-1">
-                {notification?.message}
-              </p>
-            )}
-          </div>
-        ))}
+                {n.body && (
+                  <p className="mt-0.5 text-sm text-[var(--app-text-secondary)]">{n.body}</p>
+                )}
+                <p className="mt-1 text-xs text-slate-400">{timeAgo(n.createdAt)}</p>
+              </div>
+              {n.linkUrl && (
+                <svg className="mt-1 h-4 w-4 flex-shrink-0 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+                </svg>
+              )}
+            </button>
+          );
+        })}
       </div>
     </div>
   );
-};
-
-export default Notifications;
+}

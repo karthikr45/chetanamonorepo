@@ -45,6 +45,13 @@ export const API_ENDPOINTS = {
     /** GET: notifications surfaced on the admin dashboard. */
     getAdminNotifications: "/notifications",
   },
+  notifications: {
+    list: "/notifications",
+    unreadCount: "/notifications/unread-count",
+    markAllRead: "/notifications/read-all",
+    /** PATCH usage: /notifications/:id/read */
+    markRead: "/notifications",
+  },
   templates: {
     getTemplates: "/templates",
     saveTemplate: "/templates",
