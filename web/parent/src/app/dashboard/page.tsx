@@ -364,8 +364,8 @@ export default function DashboardPage() {
               {dashboard.summary.totalPendingClearance > 0 && (
                 <div className="mb-4 p-3 rounded-lg bg-[#f7ece9] border border-[#e7c9c2] text-sm text-[#474b6b]">
                   You have <strong>{inr(dashboard.summary.totalPendingClearance)}</strong>{" "}
-                  in cheque/DD payments awaiting bank clearance — they're with the
-                  school but not yet recognised. Once cleared they'll move to
+                  in cheque/DD payments awaiting bank clearance — they&apos;re with the
+                  school but not yet recognised. Once cleared they&apos;ll move to
                   Total Paid.
                 </div>
               )}

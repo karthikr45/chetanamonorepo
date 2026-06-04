@@ -43,8 +43,13 @@ export function ParentFeedContent() {
     try {
       const res = await api.get("/social/feed?limit=40");
       setPosts(unwrap<FeedPost[]>(res.data));
-    } catch (e: any) {
-      setError(e?.response?.data?.message ?? "Could not load the feed.");
+    } catch (e) {
+      const message =
+        e && typeof e === "object" && "response" in e
+          ? (e as { response?: { data?: { message?: string } } }).response?.data
+              ?.message
+          : undefined;
+      setError(message ?? "Could not load the feed.");
     } finally {
       setLoading(false);
     }
