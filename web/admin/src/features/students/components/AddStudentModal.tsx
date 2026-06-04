@@ -74,13 +74,22 @@ export function AddStudentModal({
   // code so handleSubmit can send it on create.
   const { user } = useAuth();
   const [tenantCode, setTenantCode] = useState<string | null>(null);
+  const [tenantType, setTenantType] = useState<string | null>(null);
+  // Transport / monthly-billing fields.
+  const [pickupLocation, setPickupLocation] = useState("");
+  const [dropLocation, setDropLocation] = useState("");
+  const [monthlyFee, setMonthlyFee] = useState("");
+  const [monthlyDiscount, setMonthlyDiscount] = useState("");
 
   useEffect(() => {
     if (!open || !user?.tenantId) return;
     let cancelled = false;
     getTenantById(user.tenantId)
       .then((tenant) => {
-        if (!cancelled) setTenantCode(tenant.tenantCode || null);
+        if (!cancelled) {
+          setTenantCode(tenant.tenantCode || null);
+          setTenantType(tenant.type || null);
+        }
       })
       .catch(() => {
         /* non-fatal — submit will surface a clear error if the code is missing */
@@ -103,6 +112,13 @@ export function AddStudentModal({
     () => termOptions.map((_, i) => ORDINAL[i] ?? `${i + 1}th`),
     [termOptions],
   );
+
+  // Transport tenants collect a boarding/drop point; monthly-billing tenants
+  // (transport by default) bill one Monthly Fee instead of per-term fees.
+  const isTransport =
+    (tenantType ?? user?.tenantType ?? "").toLowerCase() === "transport";
+  const billingMode = (user?.billingMode ?? "").toLowerCase();
+  const isMonthly = billingMode === "monthly" || (billingMode === "" && isTransport);
 
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -209,6 +225,10 @@ export function AddStudentModal({
       rollNo: "",
     });
     setTerms(TERMS.map(() => ({ enabled: false, amount: "", discount: "" })));
+    setPickupLocation("");
+    setDropLocation("");
+    setMonthlyFee("");
+    setMonthlyDiscount("");
     setLinkedIdentity(null);
     setOutstanding(null);
     setIdentitySearch({ name: "", phone: "", email: "" });
@@ -232,25 +252,59 @@ export function AddStudentModal({
       }
     }
 
+    // Transport students need a boarding + drop point.
+    if (isTransport) {
+      if (!pickupLocation.trim()) {
+        setError("Boarding point is required for transport students");
+        return;
+      }
+      if (!dropLocation.trim()) {
+        setError("Drop point is required for transport students");
+        return;
+      }
+    }
+
+    // Monthly-billing tenants take a single Monthly Fee; everyone else uses
+    // the per-term grid.
+    let monthlyFeeNum: number | undefined;
+    let monthlyDiscountNum: number | undefined;
     const payloadTerms: CreateStudentPayload["terms"] = [];
-    for (let i = 0; i < terms.length; i++) {
-      const t = terms[i];
-      if (!t.enabled) continue;
-      const amount = Number(t.amount);
-      if (!Number.isFinite(amount) || amount <= 0) {
-        setError(`${TERM_LABELS[i]} term fee must be a positive number`);
+
+    if (isMonthly) {
+      monthlyFeeNum = Number(monthlyFee);
+      if (!Number.isFinite(monthlyFeeNum) || monthlyFeeNum <= 0) {
+        setError("Monthly fee must be a positive number");
         return;
       }
-      const discount = t.discount === "" ? 0 : Number(t.discount);
-      if (!Number.isFinite(discount) || discount < 0) {
-        setError(`${TERM_LABELS[i]} term discount must be 0 or more`);
+      monthlyDiscountNum = monthlyDiscount === "" ? 0 : Number(monthlyDiscount);
+      if (!Number.isFinite(monthlyDiscountNum) || monthlyDiscountNum < 0) {
+        setError("Monthly discount must be 0 or more");
         return;
       }
-      if (discount > amount) {
-        setError(`${TERM_LABELS[i]} term discount cannot exceed fee`);
+      if (monthlyDiscountNum > monthlyFeeNum) {
+        setError("Monthly discount cannot exceed the monthly fee");
         return;
       }
-      payloadTerms.push({ term: TERMS[i], amount, discount });
+    } else {
+      for (let i = 0; i < terms.length; i++) {
+        const t = terms[i];
+        if (!t.enabled) continue;
+        const amount = Number(t.amount);
+        if (!Number.isFinite(amount) || amount <= 0) {
+          setError(`${TERM_LABELS[i]} term fee must be a positive number`);
+          return;
+        }
+        const discount = t.discount === "" ? 0 : Number(t.discount);
+        if (!Number.isFinite(discount) || discount < 0) {
+          setError(`${TERM_LABELS[i]} term discount must be 0 or more`);
+          return;
+        }
+        if (discount > amount) {
+          setError(`${TERM_LABELS[i]} term discount cannot exceed fee`);
+          return;
+        }
+        payloadTerms.push({ term: TERMS[i], amount, discount });
+      }
     }
 
     if (!tenantCode) {
@@ -269,7 +323,12 @@ export function AddStudentModal({
         ...rest,
         schoolCode: tenantCode,
         identityId: linkedIdentity?.identity.id,
-        terms: payloadTerms.length ? payloadTerms : undefined,
+        ...(isTransport
+          ? { pickupLocation: pickupLocation.trim(), dropLocation: dropLocation.trim() }
+          : {}),
+        ...(isMonthly
+          ? { monthlyFee: monthlyFeeNum, monthlyDiscount: monthlyDiscountNum }
+          : { terms: payloadTerms.length ? payloadTerms : undefined }),
       });
       reset();
       onCreated();
@@ -494,25 +553,61 @@ export function AddStudentModal({
             </Field>
           </div>
 
-          <SectionHeading>
-            Term fees{" "}
-            <span className="text-xs font-normal text-[var(--app-text-secondary)]">(optional — toggle each term you want to set)</span>
-          </SectionHeading>
-          <div className="flex flex-col gap-2 mb-6">
-            {TERM_LABELS.map((label, i) => (
-              <div key={label} className="grid grid-cols-1 sm:grid-cols-12 gap-2 items-center p-3 rounded-lg bg-slate-50 border border-slate-100">
-                <label className="flex items-center gap-2 sm:col-span-3 text-sm font-semibold text-[var(--app-text-primary)]">
-                  <input type="checkbox" checked={terms[i].enabled} onChange={(e) => setTerm(i, { enabled: e.target.checked })} className="h-4 w-4 rounded border-slate-300 text-[var(--app-brand)] focus:ring-[var(--app-brand)]" />
-                  {label} Term Fee
-                </label>
-                <input type="number" min={0} value={terms[i].amount} onChange={(e) => setTerm(i, { amount: e.target.value })} placeholder="Amount" disabled={!terms[i].enabled} className="form-input form-input-tight sm:col-span-4 disabled:opacity-50" />
-                <input type="number" min={0} value={terms[i].discount} onChange={(e) => setTerm(i, { discount: e.target.value })} placeholder="Discount (optional)" disabled={!terms[i].enabled} className="form-input form-input-tight sm:col-span-3 disabled:opacity-50" />
-                <span className="sm:col-span-2 text-right text-xs font-bold text-[var(--app-text-muted)] tabular-nums">
-                  {terms[i].enabled && terms[i].amount ? `Net ₹${Math.max(0, Number(terms[i].amount) - Number(terms[i].discount || 0)).toLocaleString("en-IN")}` : ""}
+          {isTransport && (
+            <>
+              <SectionHeading>Transport</SectionHeading>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
+                <Field label="Boarding point" required>
+                  <input value={pickupLocation} onChange={(e) => setPickupLocation(e.target.value)} placeholder="e.g. Kukatpally Bus Stop" className="form-input" />
+                </Field>
+                <Field label="Drop point" required>
+                  <input value={dropLocation} onChange={(e) => setDropLocation(e.target.value)} placeholder="e.g. School Gate" className="form-input" />
+                </Field>
+              </div>
+            </>
+          )}
+
+          {isMonthly ? (
+            <>
+              <SectionHeading>
+                Monthly fee{" "}
+                <span className="text-xs font-normal text-[var(--app-text-secondary)]">(billed every month, Apr–Mar)</span>
+              </SectionHeading>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6 items-end">
+                <Field label="Monthly fee (₹)" required>
+                  <input type="number" min={0} value={monthlyFee} onChange={(e) => setMonthlyFee(e.target.value)} placeholder="3000" className="form-input" />
+                </Field>
+                <Field label="Monthly discount (₹)">
+                  <input type="number" min={0} value={monthlyDiscount} onChange={(e) => setMonthlyDiscount(e.target.value)} placeholder="0" className="form-input" />
+                </Field>
+                <span className="text-xs font-bold text-[var(--app-text-muted)] tabular-nums pb-2.5">
+                  {monthlyFee ? `Net ₹${Math.max(0, Number(monthlyFee) - Number(monthlyDiscount || 0)).toLocaleString("en-IN")}/mo × 12` : ""}
                 </span>
               </div>
-            ))}
-          </div>
+            </>
+          ) : (
+            <>
+              <SectionHeading>
+                Term fees{" "}
+                <span className="text-xs font-normal text-[var(--app-text-secondary)]">(optional — toggle each term you want to set)</span>
+              </SectionHeading>
+              <div className="flex flex-col gap-2 mb-6">
+                {TERM_LABELS.map((label, i) => (
+                  <div key={label} className="grid grid-cols-1 sm:grid-cols-12 gap-2 items-center p-3 rounded-lg bg-slate-50 border border-slate-100">
+                    <label className="flex items-center gap-2 sm:col-span-3 text-sm font-semibold text-[var(--app-text-primary)]">
+                      <input type="checkbox" checked={terms[i].enabled} onChange={(e) => setTerm(i, { enabled: e.target.checked })} className="h-4 w-4 rounded border-slate-300 text-[var(--app-brand)] focus:ring-[var(--app-brand)]" />
+                      {label} Term Fee
+                    </label>
+                    <input type="number" min={0} value={terms[i].amount} onChange={(e) => setTerm(i, { amount: e.target.value })} placeholder="Amount" disabled={!terms[i].enabled} className="form-input form-input-tight sm:col-span-4 disabled:opacity-50" />
+                    <input type="number" min={0} value={terms[i].discount} onChange={(e) => setTerm(i, { discount: e.target.value })} placeholder="Discount (optional)" disabled={!terms[i].enabled} className="form-input form-input-tight sm:col-span-3 disabled:opacity-50" />
+                    <span className="sm:col-span-2 text-right text-xs font-bold text-[var(--app-text-muted)] tabular-nums">
+                      {terms[i].enabled && terms[i].amount ? `Net ₹${Math.max(0, Number(terms[i].amount) - Number(terms[i].discount || 0)).toLocaleString("en-IN")}` : ""}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </>
+          )}
 
           {error && <div className="mb-4 p-3 rounded-lg bg-red-50 border border-red-100 text-sm text-red-700">{error}</div>}
 

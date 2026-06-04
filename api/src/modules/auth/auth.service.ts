@@ -28,6 +28,8 @@ export interface SignInDirectResult {
     role: string;
     tenantId: string | null;
     tenantName: string | null;
+    tenantType: string | null;
+    billingMode: string | null;
   };
   accessToken: string;
   refreshToken: string;
@@ -365,10 +367,14 @@ export class AuthService {
     source: 'admin' | 'user',
   ): Promise<SignInDirectResult> {
     let tenantName: string | null = null;
+    let tenantType: string | null = null;
+    let billingMode: string | null = null;
     if (user.tenantId) {
       try {
         const t = await this.tenantsService.findOne(user.tenantId);
         tenantName = t.tenantName ?? t.name ?? null;
+        tenantType = t.type ?? null;
+        billingMode = t.billingMode ?? null;
       } catch {
         tenantName = null;
       }
@@ -395,6 +401,8 @@ export class AuthService {
         role: user.role,
         tenantId: user.tenantId ?? null,
         tenantName,
+        tenantType,
+        billingMode,
       },
       accessToken,
       refreshToken,

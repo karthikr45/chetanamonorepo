@@ -153,6 +153,11 @@ export interface CreateStudentPayload {
    */
   identityId?: string;
   terms?: CreateStudentTermPayload[];
+  // ── Transport (monthly billing) ──
+  pickupLocation?: string | null;
+  dropLocation?: string | null;
+  monthlyFee?: number;
+  monthlyDiscount?: number;
 }
 
 export async function createStudentApi(payload: CreateStudentPayload): Promise<unknown> {

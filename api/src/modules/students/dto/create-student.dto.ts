@@ -10,6 +10,7 @@ import {
   IsString,
   Matches,
   Max,
+  MaxLength,
   Min,
   ValidateNested,
 } from 'class-validator';
@@ -91,6 +92,36 @@ export class CreateStudentDto {
   @IsOptional()
   @IsString()
   imgUrl?: string | null;
+
+  // ─── Transport (monthly-billing) fields ───────────────────────────
+  @ApiPropertyOptional({ example: 'Kukatpally Bus Stop', description: 'Transport boarding point.' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(200)
+  pickupLocation?: string | null;
+
+  @ApiPropertyOptional({ example: 'School Gate', description: 'Transport drop point.' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(200)
+  dropLocation?: string | null;
+
+  @ApiPropertyOptional({
+    example: 3000,
+    description:
+      'Monthly fee (transport / monthly-billing tenants). When set, one fee ' +
+      'is created for every month of the academic year (Apr–Mar).',
+  })
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  monthlyFee?: number;
+
+  @ApiPropertyOptional({ example: 0, description: 'Monthly concession (rupees).' })
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  monthlyDiscount?: number;
 
   @ApiPropertyOptional({
     description:

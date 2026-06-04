@@ -23,6 +23,7 @@ import {
 } from './utils/row-validator.util';
 import { UpsertStudentInput } from './dto/student.dto';
 import { CreateFeeInput } from '../fees/dto/fee.dto';
+import { MonthType, FeePeriod } from '../fees/entities/fee.entity';
 import { Student } from './entities/student.entity';
 import { Tenant } from '../tenants/entities/tenant.entity';
 
@@ -259,7 +260,11 @@ export class UploadService {
       rollNo: string;
       imgUrl?: string | null;
       identityId?: string;
+      pickupLocation?: string | null;
+      dropLocation?: string | null;
       terms?: { term: string; amount: number; discount?: number }[];
+      monthlyFee?: number;
+      monthlyDiscount?: number;
     },
   ) {
     // Resolve / create the identity OUTSIDE the transaction so a fresh
@@ -292,6 +297,8 @@ export class UploadService {
             section: dto.section.trim(),
             rollNo: dto.rollNo.trim(),
             imgUrl: dto.imgUrl ?? null,
+            pickupLocation: dto.pickupLocation ?? null,
+            dropLocation: dto.dropLocation ?? null,
           },
         ],
         manager,
@@ -322,21 +329,32 @@ export class UploadService {
         manager,
       );
 
-      let feesCreated = 0;
-      if (dto.terms?.length) {
-        feesCreated = await this.feesService.bulkCreate(
-          dto.terms.map((t) => ({
-            tenantId,
-            branch: schoolCode,
-            academicYear: dto.academicYear.trim(),
-            studentId,
-            term: t.term as any,
-            originalAmount: t.amount,
-            totalDiscount: t.discount ?? 0,
-          })),
-          manager,
-        );
+      // Monthly-billing tenants (transport) bill one fee per academic-year
+      // month (Apr–Mar); term-wise tenants bill per term column. A monthly
+      // fee, when set, takes precedence over any term rows.
+      let feeInputs: CreateFeeInput[] = [];
+      if (dto.monthlyFee != null && dto.monthlyFee > 0) {
+        feeInputs = Object.values(MonthType).map((month) => ({
+          tenantId,
+          academicYear: dto.academicYear.trim(),
+          studentId,
+          term: month,
+          originalAmount: dto.monthlyFee as number,
+          totalDiscount: dto.monthlyDiscount ?? 0,
+        }));
+      } else if (dto.terms?.length) {
+        feeInputs = dto.terms.map((t) => ({
+          tenantId,
+          academicYear: dto.academicYear.trim(),
+          studentId,
+          term: t.term as FeePeriod,
+          originalAmount: t.amount,
+          totalDiscount: t.discount ?? 0,
+        }));
       }
+      const feesCreated = feeInputs.length
+        ? await this.feesService.bulkCreate(feeInputs, manager)
+        : 0;
 
       return {
         message: 'Student created',

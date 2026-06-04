@@ -9,6 +9,10 @@ export interface AuthUser {
   role: string;
   tenantId: string | null;
   tenantName?: string | null;
+  /** Tenant service: School / Hostel / Transport. Drives the Add Student form. */
+  tenantType?: string | null;
+  /** term_wise | monthly (null → derived from tenantType: transport = monthly). */
+  billingMode?: string | null;
   // The tenant's school code on the historical "branch" column. Used to
   // pre-fill the default branch on tenant-admin forms (Add Student, etc).
   branch: string | null;
@@ -23,6 +27,8 @@ export interface LoginApiData {
   role: string;
   tenantId: string | null;
   tenantName?: string | null;
+  tenantType?: string | null;
+  billingMode?: string | null;
   id: string;
   branch?: string | null;
 }

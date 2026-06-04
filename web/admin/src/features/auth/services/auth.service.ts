@@ -167,6 +167,8 @@ function persistTokens(payload: LoginApiData): AuthUser {
     role,
     tenantId,
     tenantName,
+    tenantType,
+    billingMode,
     branch,
     id,
   } = payload;
@@ -179,6 +181,8 @@ function persistTokens(payload: LoginApiData): AuthUser {
     role,
     tenantId: tenantId ?? null,
     tenantName: tenantName ?? null,
+    tenantType: tenantType ?? null,
+    billingMode: billingMode ?? null,
     branch: branch ?? null,
     id,
   };
