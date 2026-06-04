@@ -209,9 +209,16 @@ export class AzureStorageService {
     // so file transfer is functional out of the box.
     const cfg = await this.resolveConfig(args.tenantId).catch(() => null);
     if (!cfg || !this.hasAzureStorage(cfg)) {
+      this.logger.log(
+        `uploadFile: tenant ${args.tenantId} has no Azure storage configured ` +
+          `(connection string / account-key + container) — using local disk fallback.`,
+      );
       return this.uploadLocal(args);
     }
 
+    this.logger.log(
+      `uploadFile: tenant ${args.tenantId} → Azure container "${cfg.storageContainerName}".`,
+    );
     const { blobService, container, baseHost } = this.clientFromConfig(cfg);
     const containerClient = blobService.getContainerClient(container);
 

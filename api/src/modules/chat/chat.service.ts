@@ -447,17 +447,36 @@ export class ChatService {
     file: { buffer: Buffer; mimetype: string; originalname: string; size: number },
   ): Promise<MessageAttachment> {
     await this.assertParticipant(caller, conversationId);
+    this.logger.log(
+      `Chat attachment upload start: conv=${conversationId} ` +
+        `file="${file?.originalname ?? '?'}" size=${file?.size ?? file?.buffer?.length ?? 0} ` +
+        `mime=${file?.mimetype ?? '?'} by=${caller.userId}`,
+    );
     if (!file?.buffer?.length) {
+      this.logger.warn(
+        `Chat upload rejected — no file in request (conv=${conversationId}). ` +
+          `Check the multipart field name is "file".`,
+      );
       throw new BadRequestException('No file provided.');
     }
     const tenantId = await this.resolveStorageTenant(caller, conversationId);
-    const { url } = await this.storage.uploadFile({
-      tenantId,
-      buffer: file.buffer,
-      mimeType: file.mimetype,
-      originalName: file.originalname,
-      folder: 'chat-files',
-    });
+    let url: string;
+    try {
+      ({ url } = await this.storage.uploadFile({
+        tenantId,
+        buffer: file.buffer,
+        mimeType: file.mimetype,
+        originalName: file.originalname,
+        folder: 'chat-files',
+      }));
+    } catch (err) {
+      this.logger.error(
+        `Chat attachment storage FAILED (conv=${conversationId}, tenant=${tenantId}): ` +
+          `${(err as Error)?.message ?? err}`,
+      );
+      throw err;
+    }
+    this.logger.log(`Chat attachment stored → ${url} (conv=${conversationId})`);
     return {
       url,
       name: file.originalname || 'file',
@@ -529,6 +548,10 @@ export class ChatService {
       return msg;
     });
 
+    this.logger.log(
+      `Chat message ${saved.id} saved to DB (conv=${conversationId}, ` +
+        `attachments=${atts.length}, textLen=${text.length}, by=${caller.userId})`,
+    );
     const enriched = await this.toWireWithReply(saved);
     // Fire-and-forget realtime fan-out to the conversation room.
     this.gateway?.emitMessage(conversationId, enriched);
@@ -561,6 +584,9 @@ export class ChatService {
       .where('p.conversationId = :id', { id: conversationId })
       .andWhere('p.adminId != :me', { me: caller.userId })
       .getMany();
+    this.logger.log(
+      `Chat notify: ${peers.length} peer(s) to notify for conv=${conversationId}`,
+    );
     if (!peers.length) return;
 
     const sender = await this.adminRepo.findOne({
