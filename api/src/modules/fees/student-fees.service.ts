@@ -2,7 +2,6 @@ import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { In, Repository } from 'typeorm';
 import { Fee } from './entities/fee.entity';
-import { FeePayment } from './entities/fee-payment.entity';
 
 export interface FeePaymentView {
   id: string;
@@ -31,19 +30,18 @@ export interface StudentFeeSummary {
 
 /**
  * Read-side service that returns all fees for a given student in a given
- * academic year, each fee with its payment history.
+ * academic year, straight from the `fees` table (which already carries the
+ * per-term net / paid / status).
  *
- * Lives in the fees module (not students) because it reads only from
- * fees-owned tables. The students controller calls this to build the
- * "student with fees" response; the students module thus depends one-way
- * on fees, no circular import.
+ * It deliberately does NOT read the `payments` table — that table holds the
+ * individual transactions / offline payment records and is fetched on demand
+ * via the dedicated payment endpoints (e.g. GET /fees/:id/payments). The
+ * students list only needs the fee summary, so it stays a single query.
  */
 @Injectable()
 export class StudentFeesService {
   constructor(
     @InjectRepository(Fee) private readonly feeRepo: Repository<Fee>,
-    @InjectRepository(FeePayment)
-    private readonly paymentRepo: Repository<FeePayment>,
   ) {}
 
   async getFeesForStudent(
@@ -58,8 +56,8 @@ export class StudentFeesService {
   }
 
   /**
-   * Bulk variant used by list endpoints. Fetches fees + payments for many
-   * students in two queries regardless of the student count, avoiding N+1.
+   * Bulk variant used by list endpoints. Fetches fees for many students in a
+   * single query (from the `fees` table) regardless of student count.
    * Returns a map keyed by studentId; students with no fees are absent.
    *
    * Each ref carries its own academicYear because students in a list may
@@ -96,23 +94,6 @@ export class StudentFeesService {
 
     if (!matched.length) return out;
 
-    const feeIds = matched.map((f) => f.id);
-    const payments = await this.paymentRepo
-      .createQueryBuilder('p')
-      .where('p.feeId IN (:...feeIds)', { feeIds })
-      .andWhere('p.tenantId = :tenantId', { tenantId })
-      // Settled ledger entries only — skip unrecognised gateway orders.
-      .andWhere('p.receipt_number IS NOT NULL')
-      .orderBy('p.paidAt', 'DESC')
-      .getMany();
-
-    const paymentsByFeeId = new Map<string, FeePayment[]>();
-    for (const p of payments) {
-      if (!p.feeId) continue;
-      if (!paymentsByFeeId.has(p.feeId)) paymentsByFeeId.set(p.feeId, []);
-      paymentsByFeeId.get(p.feeId)!.push(p);
-    }
-
     for (const fee of matched) {
       const summary: StudentFeeSummary = {
         feeId: fee.id,
@@ -126,17 +107,9 @@ export class StudentFeesService {
           Number(fee.netAmount) - Number(fee.paidAmount)
         ).toFixed(2),
         paymentStatus: fee.paymentStatus,
-        payments: (paymentsByFeeId.get(fee.id) ?? []).map((p) => ({
-          id: p.id,
-          amount: p.amount,
-          paymentType: p.method ?? '',
-          orderId: p.orderId,
-          transactionId: p.transactionId,
-          chequeNumber: p.chequeNumber,
-          ddNumber: p.ddNumber,
-          bankName: p.bankName,
-          paidAt: p.paidAt,
-        })),
+        // Payment transactions live in the `payments` table and are fetched
+        // on demand via the payment endpoints — not joined into the list.
+        payments: [],
       };
       if (!out.has(fee.studentId)) out.set(fee.studentId, []);
       out.get(fee.studentId)!.push(summary);

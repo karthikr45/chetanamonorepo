@@ -193,8 +193,10 @@ export class Payment {
   @Column({ type: 'text', nullable: true })
   failureReason: string | null;
 
-  // Refund tracking (rupees) — used when status transitions to REFUNDED
-  @Column({ name: 'refunded_amount', type: 'decimal', precision: 12, scale: 2, nullable: true })
+  // Refund tracking (rupees) — used when status transitions to REFUNDED.
+  // Column stays camelCase `refundedAmount` (matches the original payments
+  // table; the consolidation migration only changed its type).
+  @Column({ type: 'decimal', precision: 12, scale: 2, nullable: true })
   refundedAmount: string | null;
 
   @Column({ type: 'timestamptz', nullable: true })
