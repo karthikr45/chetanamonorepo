@@ -4,9 +4,14 @@ import { Repository } from 'typeorm';
 import { FeePayment } from './entities/fee-payment.entity';
 import { Fee } from './entities/fee.entity';
 import { Tenant } from '../tenants/entities/tenant.entity';
+import { TenantConfig } from '../tenant-configs/entities/tenant-config.entity';
 import { Student } from '../students/entities/student.entity';
 import { ReceiptPdfService } from './receipt-pdf.service';
 import { AzureStorageService } from '../storage/azure-storage.service';
+
+/** Fallback receipt logo when the tenant config has none configured. */
+const DEFAULT_RECEIPT_LOGO =
+  'https://aautifileuploads.blob.core.windows.net/svbk/svbk_receipt_logo.png';
 
 /** Offline payment types — everything else is treated as an online/gateway payment. */
 const OFFLINE_TYPES = new Set(['CASH', 'CHEQUE', 'DD', 'POS', 'NEFT']);
@@ -66,6 +71,8 @@ export class ReceiptStorageService {
     private readonly studentRepo: Repository<Student>,
     @InjectRepository(Tenant)
     private readonly tenantRepo: Repository<Tenant>,
+    @InjectRepository(TenantConfig)
+    private readonly tenantConfigRepo: Repository<TenantConfig>,
     private readonly receiptPdf: ReceiptPdfService,
     private readonly storage: AzureStorageService,
   ) {}
@@ -100,7 +107,18 @@ export class ReceiptStorageService {
     const tenant = await this.tenantRepo.findOne({ where: { id: tenantId } });
     if (!tenant) throw new NotFoundException('Tenant not found.');
 
-    const html = this.buildReceiptHtml(fp, fee, student);
+    // Logo comes from the tenant's active configuration: prefer the
+    // dedicated receipt logo, fall back to the general logo, then default.
+    const cfg = await this.tenantConfigRepo.findOne({
+      where: { tenantId, isActive: true },
+      order: { createdAt: 'DESC' },
+    });
+    const logoUrl =
+      cfg?.receiptLogoUrl?.trim() ||
+      cfg?.logoUrl?.trim() ||
+      DEFAULT_RECEIPT_LOGO;
+
+    const html = this.buildReceiptHtml(fp, fee, student, logoUrl);
     const pdf = await this.receiptPdf.htmlToPdf(html);
 
     const { url } = await this.storage.uploadReceiptPdf({
@@ -118,7 +136,12 @@ export class ReceiptStorageService {
    * Student). Self-contained (inline CSS), so puppeteer can render it
    * with no external assets beyond the logo image.
    */
-  private buildReceiptHtml(fp: FeePayment, fee: Fee, student: Student): string {
+  private buildReceiptHtml(
+    fp: FeePayment,
+    fee: Fee,
+    student: Student,
+    logoUrl: string,
+  ): string {
     const offlinePayment = fp.method ? OFFLINE_TYPES.has(fp.method) : false;
     const paymentMode =
       (fp.method ? MODE_LABELS[fp.method] : null) ?? fp.method ?? '';
@@ -204,7 +227,7 @@ export class ReceiptStorageService {
 
         <body>
             <div id="main">
-                <img src="https://aautifileuploads.blob.core.windows.net/svbk/svbk_receipt_logo.png" alt="Avatar" style="width:600px;height:110px" class="center">
+                <img src="${esc(logoUrl)}" alt="School logo" style="width:600px;height:110px" class="center">
             </div>
             <p style="text-align:center; font-size: 24px">Fee Receipt</p>
             <div>

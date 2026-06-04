@@ -5,6 +5,7 @@ import { FeePayment } from './entities/fee-payment.entity';
 import { FeeAdjustment } from './entities/fee-adjustment.entity';
 import { ReceiptSequence } from './entities/receipt-sequence.entity';
 import { Tenant } from '../tenants/entities/tenant.entity';
+import { TenantConfig } from '../tenant-configs/entities/tenant-config.entity';
 import { Student } from '../students/entities/student.entity';
 import { FeesService } from './fees.service';
 import { StudentFeesService } from './student-fees.service';
@@ -23,6 +24,7 @@ import { StorageModule } from '../storage/storage.module';
       FeeAdjustment,
       ReceiptSequence,
       Tenant,
+      TenantConfig,
       Student,
     ]),
     ReceiptTemplatesModule,

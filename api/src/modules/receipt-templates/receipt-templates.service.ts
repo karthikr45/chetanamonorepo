@@ -22,6 +22,7 @@ import {
 } from '../fees/entities/fee-payment.entity';
 import { Student } from '../students/entities/student.entity';
 import { Tenant } from '../tenants/entities/tenant.entity';
+import { TenantConfig } from '../tenant-configs/entities/tenant-config.entity';
 import { SystemMetadata } from '../system-metadata/entities/system-metadata.entity';
 import {
   formatINR,
@@ -314,8 +315,9 @@ export class ReceiptTemplatesService {
     args: { paymentId?: string; feeId?: string; sample?: boolean },
   ): Promise<TemplateContext> {
     const tenant = await this.tenantRepo.findOne({ where: { id: tenantId } });
+    const logoUrl = await this.resolveReceiptLogo(tenantId);
 
-    if (args.sample) return this.sampleContext(tenant);
+    if (args.sample) return this.sampleContext(tenant, logoUrl);
 
     let payment: FeePayment | null = null;
     let fee: Fee | null = null;
@@ -350,10 +352,23 @@ export class ReceiptTemplatesService {
       );
     }
 
-    return this.makeContext(tenant, fee, student, payment);
+    return this.makeContext(tenant, fee, student, payment, logoUrl);
   }
 
-  private sampleContext(tenant: Tenant | null): TemplateContext {
+  /**
+   * The school logo for receipts — from the tenant's active configuration
+   * (receipt logo preferred, else the general logo). Empty when none set,
+   * so templates can decide whether to render an <img>.
+   */
+  private async resolveReceiptLogo(tenantId: string): Promise<string> {
+    const cfg = await this.dataSource.getRepository(TenantConfig).findOne({
+      where: { tenantId, isActive: true },
+      order: { createdAt: 'DESC' },
+    });
+    return cfg?.receiptLogoUrl?.trim() || cfg?.logoUrl?.trim() || '';
+  }
+
+  private sampleContext(tenant: Tenant | null, logoUrl = ''): TemplateContext {
     const fakeFee: Partial<Fee> = {
       term: TermType.FIRST,
       academicYear: '2025-2026',
@@ -383,6 +398,7 @@ export class ReceiptTemplatesService {
       fakeFee as Fee,
       fakeStudent as Student,
       fakePayment as FeePayment,
+      logoUrl,
     );
   }
 
@@ -391,6 +407,7 @@ export class ReceiptTemplatesService {
     fee: Fee | null,
     student: Student | null,
     payment: FeePayment | null,
+    logoUrl = '',
   ): TemplateContext {
     const now = new Date();
     const paidAt = payment?.paidAt ?? now;
@@ -405,6 +422,7 @@ export class ReceiptTemplatesService {
         ? {
             name: tenant.name ?? '',
             tenantName: tenant.tenantName ?? '',
+            logoUrl,
             code: tenant.code ?? '',
             tenantCode: tenant.tenantCode ?? '',
             address: tenant.address ?? '',
@@ -494,6 +512,7 @@ export class ReceiptTemplatesService {
         group: 'Tenant',
         keys: [
           { key: 'tenant.tenantName', label: 'School name' },
+          { key: 'tenant.logoUrl', label: 'School logo URL' },
           { key: 'tenant.address', label: 'Address' },
           { key: 'tenant.city', label: 'City' },
           { key: 'tenant.state', label: 'State' },
