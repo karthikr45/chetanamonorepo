@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { FeePayment } from './entities/fee-payment.entity';
@@ -62,6 +62,8 @@ function esc(v: unknown): string {
  */
 @Injectable()
 export class ReceiptStorageService {
+  private readonly logger = new Logger(ReceiptStorageService.name);
+
   constructor(
     @InjectRepository(FeePayment)
     private readonly feePaymentRepo: Repository<FeePayment>,
@@ -120,6 +122,14 @@ export class ReceiptStorageService {
       configs.find((c) => c.receiptLogoUrl?.trim())?.receiptLogoUrl?.trim() ||
       configs.find((c) => c.logoUrl?.trim())?.logoUrl?.trim() ||
       DEFAULT_RECEIPT_LOGO;
+
+    // Diagnostic: shows which logo the receipt actually used and why.
+    this.logger.log(
+      `Receipt logo for tenant=${tenantId}: activeConfigs=${configs.length} ` +
+        `receiptLogoUrls=${JSON.stringify(configs.map((c) => c.receiptLogoUrl ?? null))} ` +
+        `logoUrls=${JSON.stringify(configs.map((c) => c.logoUrl ?? null))} ` +
+        `→ resolved=${logoUrl}${logoUrl === DEFAULT_RECEIPT_LOGO ? ' (DEFAULT fallback)' : ''}`,
+    );
 
     const html = this.buildReceiptHtml(fp, fee, student, logoUrl);
     const pdf = await this.receiptPdf.htmlToPdf(html);
