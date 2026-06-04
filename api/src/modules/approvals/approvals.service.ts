@@ -29,6 +29,14 @@ export interface ApprovalCaller {
 
 const APPROVERS = [Role.ADMIN, Role.SUPER_ADMIN] as string[];
 
+/** Only discount requests are emailed to approvers (penalty is excluded). */
+const DISCOUNT_ACTIONS = new Set<ApprovalAction>([
+  ApprovalAction.DISCOUNT_ADD_BULK,
+  ApprovalAction.DISCOUNT_WAIVE_BULK,
+  ApprovalAction.DISCOUNT_ADD_SINGLE,
+  ApprovalAction.DISCOUNT_WAIVE_SINGLE,
+]);
+
 /** Friendly label for each approval action, used in emails / subjects. */
 const ACTION_LABEL: Record<ApprovalAction, string> = {
   [ApprovalAction.DISCOUNT_ADD_BULK]: 'Bulk discount request',
@@ -113,8 +121,13 @@ export class ApprovalsService {
    * Emails every active tenant admin a concession-approval request with a
    * direct link to the approvals screen (deep-linked to this request). Uses
    * the tenant's own SMTP config when present, falling back to platform SMTP.
+   *
+   * Only discount requests are emailed — penalty waive-offs still queue and
+   * post an in-app notification, but don't trigger an email.
    */
   private async emailApprovers(a: AdjustmentApproval): Promise<void> {
+    if (!DISCOUNT_ACTIONS.has(a.action)) return;
+
     const [admins, cfg] = await Promise.all([
       this.admins.findAll(a.tenantId),
       this.tenantConfigs.findActiveForTenant(a.tenantId),
