@@ -456,35 +456,26 @@ export class StudentsService {
       existingMap.set(this.key(s.admissionNumber, s.academicYear), s);
     }
 
-    // 2. Partition into create vs update
+    // 2. Partition into create vs skip. Existing records are NEVER updated
+    //    from an upload — once a student row exists it is immutable here, so
+    //    re-uploading the same admission leaves its details as they are. We
+    //    still resolve its id so brand-new fee periods can be attached.
     const toCreate: Student[] = [];
-    const toUpdate: Student[] = [];
+    let skipped = 0;
 
     for (const input of inputs) {
       const k = this.key(input.admissionNumber, input.academicYear);
       const found = existingMap.get(k);
 
       if (found) {
-        found.name = input.name;
-        found.email = input.email;
-        found.phoneNumber = input.phoneNumber;
-        found.class = input.class;
-        found.section = input.section;
-        found.rollNo = input.rollNo;
-        if (input.imgUrl) found.imgUrl = input.imgUrl;
-        if (input.pickupLocation !== undefined) {
-          found.pickupLocation = input.pickupLocation;
-        }
-        if (input.dropLocation !== undefined) {
-          found.dropLocation = input.dropLocation;
-        }
-        toUpdate.push(found);
+        idByKey.set(k, found.id);
+        skipped++;
       } else {
         toCreate.push(repo.create(input));
       }
     }
 
-    // 3. Batch inserts
+    // 3. Batch inserts (new students only)
     for (let i = 0; i < toCreate.length; i += BATCH_SIZE) {
       const chunk = toCreate.slice(i, i + BATCH_SIZE);
       const saved = await repo.save(chunk);
@@ -493,19 +484,10 @@ export class StudentsService {
       );
     }
 
-    // 4. Batch updates
-    for (let i = 0; i < toUpdate.length; i += BATCH_SIZE) {
-      const chunk = toUpdate.slice(i, i + BATCH_SIZE);
-      await repo.save(chunk);
-      chunk.forEach((s) =>
-        idByKey.set(this.key(s.admissionNumber, s.academicYear), s.id),
-      );
-    }
-
     this.logger.log(
-      `Upserted students: ${toCreate.length} created, ${toUpdate.length} updated`,
+      `Upserted students: ${toCreate.length} created, ${skipped} existing left unchanged`,
     );
-    return { created: toCreate.length, updated: toUpdate.length, idByKey };
+    return { created: toCreate.length, updated: 0, idByKey };
   }
 
   /**

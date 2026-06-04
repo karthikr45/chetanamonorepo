@@ -286,12 +286,12 @@ export class FeesService {
   /**
    * Create-or-update per-period fees for one student from the Edit Student
    * screen. Monthly (transport) tenants use this to add a month that wasn't
-   * billed yet, adjust a month's amount/discount, or change the boarding /
-   * drop point month-wise.
+   * billed yet, or change the boarding / drop point month-wise.
    *
-   * For an existing fee, only the fields present in the edit are touched.
-   * Reducing the amount below what's already been paid is rejected (we never
-   * lose payment history). Missing periods are created when an amount is given.
+   * IMMUTABILITY RULE: once a fee exists its amount and discount are fixed —
+   * they can never be edited here (or from an Excel re-upload). Only the
+   * operational boarding/drop point may change on an existing fee. Missing
+   * periods are still created when an amount is given.
    */
   async applyPeriodFeeEdits(
     tenantId: string,
@@ -324,32 +324,21 @@ export class FeesService {
         });
 
         if (fee) {
-          if (edit.amount !== undefined) {
-            fee.originalAmount = Math.max(0, edit.amount).toFixed(2);
-          }
-          if (edit.discount !== undefined) {
-            fee.totalDiscount = Math.max(0, edit.discount).toFixed(2);
-          }
-          // Discount can't exceed the (possibly new) original amount.
-          if (Number(fee.totalDiscount) > Number(fee.originalAmount)) {
-            throw new BadRequestException(
-              `${edit.term}: discount cannot exceed the fee amount.`,
-            );
-          }
-          this.recomputeDerived(fee);
-          if (Number(fee.netAmount) < Number(fee.paidAmount) - 0.01) {
-            throw new BadRequestException(
-              `${edit.term}: amount cannot be reduced below the ₹${fee.paidAmount} already paid.`,
-            );
-          }
+          // Amount / discount are immutable once the fee exists — ignore any
+          // amount/discount in the edit. Only boarding/drop may change.
+          let touched = false;
           if (edit.pickupLocation !== undefined) {
             fee.pickupLocation = edit.pickupLocation || null;
+            touched = true;
           }
           if (edit.dropLocation !== undefined) {
             fee.dropLocation = edit.dropLocation || null;
+            touched = true;
           }
-          await repo.save(fee);
-          updated++;
+          if (touched) {
+            await repo.save(fee);
+            updated++;
+          }
         } else if (edit.amount !== undefined && edit.amount > 0) {
           const discount = Math.min(
             Math.max(0, edit.discount ?? 0),

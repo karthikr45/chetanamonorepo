@@ -171,13 +171,17 @@ export function EditStudentForm({ student, formId, onSubmit, onStatusChangeToPai
           </h3>
           {isMonthly && (
             <p className="mb-3 text-xs" style={{ color: "var(--app-text-secondary)" }}>
-              Set an amount on a month to add it to this student&apos;s bill.
+              Set an amount on a month to add it to this student&apos;s bill. Once
+              a fee is added its amount is fixed and can&apos;t be edited here.
               {isTransport ? " Boarding/drop can differ by month." : ""}
             </p>
           )}
           <div className="space-y-3">
             {periodNames.map((periodName) => {
               const term = form.termFees[periodName] ?? emptyItem;
+              // Once a fee exists its amount is locked — admins can record
+              // payments / change boarding-drop, but never the amount itself.
+              const feeExists = Boolean(term.feeId);
               return (
                 <div
                   key={periodName}
@@ -192,7 +196,10 @@ export function EditStudentForm({ student, formId, onSubmit, onStatusChangeToPai
                       type="number"
                       value={term.originalAmount ?? term.amount}
                       onChange={(e) => setTermFee(periodName, "originalAmount", Number(e.target.value))}
-                      className={inputClass}
+                      disabled={feeExists}
+                      readOnly={feeExists}
+                      title={feeExists ? "Fee amount is fixed once added and cannot be edited." : undefined}
+                      className={`${inputClass} ${feeExists ? "cursor-not-allowed opacity-60" : ""}`}
                       style={inputStyle}
                     />
                   </FieldGroup>
