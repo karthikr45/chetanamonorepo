@@ -57,7 +57,8 @@ const emptyConfig: NewConfig = {
   privacyPolicyUrl: "",
   termsAndConditionsUrl: "",
   refundPolicyUrl: "",
-  storageTab: "accessKeys",
+  // Access Keys storage is disabled in the UI for now — Connection String only.
+  storageTab: "connectionString",
   accessKey: "",
   secretKey: "",
   bucketName: "",
@@ -729,6 +730,12 @@ function TenantDetailsPageContent() {
             <legend className="text-sm font-semibold uppercase tracking-wide text-[var(--app-text-secondary)]">
               File Storage
             </legend>
+
+            {/*
+              Access Keys storage is temporarily disabled in the UI — only
+              Connection String is supported for now. To restore, un-comment the
+              tab toggle and the Access Keys block below.
+
             <div className="grid w-full min-w-0 grid-cols-2 gap-2 sm:flex sm:w-auto sm:flex-row">
               {(["accessKeys", "connectionString"] as const).map((tab) => (
                 <button
@@ -786,28 +793,27 @@ function TenantDetailsPageContent() {
                 />
               </div>
             )}
+            */}
 
-            {newConfig.storageTab === "connectionString" && (
-              <div className="grid min-w-0 gap-4 sm:grid-cols-2">
-                <Input
-                  label="Connection String"
-                  placeholder="DefaultEndpointsProtocol=https;..."
-                  value={newConfig.accessKey}
-                  onChange={(e) => updateNew({ accessKey: e.target.value })}
-                  error={newConfigErrors.accessKey}
-                  fullWidth
-                  className="sm:col-span-2"
-                />
-                <Input
-                  label="Container Name"
-                  placeholder="e.g. media-uploads"
-                  value={newConfig.containerName}
-                  onChange={(e) => updateNew({ containerName: e.target.value })}
-                  error={newConfigErrors.containerName}
-                  fullWidth
-                />
-              </div>
-            )}
+            <div className="grid min-w-0 gap-4 sm:grid-cols-2">
+              <Input
+                label="Connection String"
+                placeholder="DefaultEndpointsProtocol=https;..."
+                value={newConfig.accessKey}
+                onChange={(e) => updateNew({ accessKey: e.target.value })}
+                error={newConfigErrors.accessKey}
+                fullWidth
+                className="sm:col-span-2"
+              />
+              <Input
+                label="Container Name"
+                placeholder="e.g. media-uploads"
+                value={newConfig.containerName}
+                onChange={(e) => updateNew({ containerName: e.target.value })}
+                error={newConfigErrors.containerName}
+                fullWidth
+              />
+            </div>
           </fieldset>
 
           <div className="border-t border-[var(--app-divider)]" />

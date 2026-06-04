@@ -27,7 +27,8 @@ function emptyTenantConfigForm(): TenantConfigForm {
     privacyPolicyUrl: "",
     termsAndConditionsUrl: "",
     refundPolicyUrl: "",
-    storageTab: "accessKeys",
+    // Access Keys storage is disabled in the UI for now — Connection String only.
+    storageTab: "connectionString",
     accessKey: "",
     secretKey: "",
     bucketName: "",
@@ -48,8 +49,8 @@ function emptyTenantConfigForm(): TenantConfigForm {
 }
 
 function serverConfigToForm(row: SaveTenantConfigPayload): TenantConfigForm {
-  const storageTab =
-    row.storageTab === "connectionString" ? "connectionString" : "accessKeys";
+  // Access Keys storage is disabled in the UI for now — always Connection String.
+  const storageTab = "connectionString" as const;
   return {
     configName: row.configName ?? "",
     logoUrl: row.logoUrl ?? "",
@@ -403,6 +404,12 @@ export default function EnvConfigPage() {
         </ConfigSection>
 
         <ConfigSection title="File Storage">
+          {/*
+            Access Keys storage is temporarily disabled in the UI — only
+            Connection String is supported for now. To restore, un-comment the
+            tab toggle and the Access Keys block below (and revert storageTab
+            handling in emptyTenantConfigForm / serverConfigToForm).
+
           <div className="sm:col-span-2">
             <div className="flex gap-2">
               <button
@@ -459,26 +466,23 @@ export default function EnvConfigPage() {
               />
             </>
           )}
+          */}
 
-          {config.storageTab === "connectionString" && (
-            <>
-              <Input
-                label="Connection String"
-                value={config.accessKey}
-                onChange={(e) => updateConfig({ accessKey: e.target.value })}
-                error={errors.accessKey}
-                fullWidth
-              />
-              <Input
-                label="Container Name"
-                placeholder="e.g. media-uploads"
-                value={config.containerName}
-                onChange={(e) => updateConfig({ containerName: e.target.value })}
-                error={errors.containerName}
-                fullWidth
-              />
-            </>
-          )}
+          <Input
+            label="Connection String"
+            value={config.accessKey}
+            onChange={(e) => updateConfig({ accessKey: e.target.value })}
+            error={errors.accessKey}
+            fullWidth
+          />
+          <Input
+            label="Container Name"
+            placeholder="e.g. media-uploads"
+            value={config.containerName}
+            onChange={(e) => updateConfig({ containerName: e.target.value })}
+            error={errors.containerName}
+            fullWidth
+          />
         </ConfigSection>
 
         <ConfigSection title="Payment Gateway">
