@@ -3,12 +3,14 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Brackets, Repository } from 'typeorm';
 import { Notification } from './entities/notification.entity';
 import { CreateNotificationDto } from './dto/create-notification.dto';
+import { NotificationsGateway } from './notifications.gateway';
 
 @Injectable()
 export class NotificationsService {
   constructor(
     @InjectRepository(Notification)
     private readonly repo: Repository<Notification>,
+    private readonly gateway: NotificationsGateway,
   ) {}
 
   async send(
@@ -26,7 +28,10 @@ export class NotificationsService {
       linkUrl: dto.linkUrl ?? null,
       createdBy,
     });
-    return this.repo.save(n);
+    const saved = await this.repo.save(n);
+    // Push to any connected recipients so the bell updates instantly.
+    this.gateway.emitNotification(saved);
+    return saved;
   }
 
   /** Notifications visible to a user: targeted to them, or a broadcast. */
