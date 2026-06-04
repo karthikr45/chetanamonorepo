@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { PageHeader } from "@/components/layout";
 import { Card } from "@/components/ui/Card";
 import { useAuth } from "@/features/auth";
@@ -21,6 +22,9 @@ const TABS: { key: ApprovalStatus; label: string }[] = [
 
 export function ApprovalsContent() {
   const { user } = useAuth();
+  const searchParams = useSearchParams();
+  // Deep link from the approval-request email: /approvals?focus=<id>
+  const focusId = searchParams.get("focus");
   const canDecide =
     user?.role === "admin" || user?.role === "super_admin";
 
@@ -45,6 +49,39 @@ export function ApprovalsContent() {
   useEffect(() => {
     load(tab);
   }, [tab, load]);
+
+  // When arriving via the email link, find which tab holds the request,
+  // switch to it and expand its details.
+  useEffect(() => {
+    if (!focusId) return;
+    let cancelled = false;
+    (async () => {
+      for (const status of ["PENDING", "APPROVED", "REJECTED"] as ApprovalStatus[]) {
+        try {
+          const list = await listApprovalsApi(status);
+          if (cancelled) return;
+          if (list.some((r) => r.id === focusId)) {
+            setTab(status);
+            setOpenId(focusId);
+            break;
+          }
+        } catch {
+          /* keep trying the other tabs */
+        }
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [focusId]);
+
+  // Scroll the focused request into view once its tab's rows are rendered.
+  useEffect(() => {
+    if (!focusId || loading) return;
+    if (!rows.some((r) => r.id === focusId)) return;
+    const el = document.getElementById(`approval-${focusId}`);
+    if (el) el.scrollIntoView({ behavior: "smooth", block: "center" });
+  }, [focusId, loading, rows]);
 
   async function act(
     id: string,
@@ -107,8 +144,14 @@ export function ApprovalsContent() {
           <ul className="divide-y divide-slate-100">
             {rows.map((r) => {
               const open = openId === r.id;
+              const focused = focusId === r.id;
               return (
-                <li key={r.id} className="px-5 py-4">
+                <li
+                  key={r.id}
+                  id={`approval-${r.id}`}
+                  className="px-5 py-4 transition-colors"
+                  style={focused ? { backgroundColor: "#eef2ff" } : undefined}
+                >
                   <div className="flex items-start justify-between gap-4">
                     <div className="min-w-0">
                       <p className="text-sm font-semibold text-slate-900">
