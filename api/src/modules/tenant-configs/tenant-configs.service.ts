@@ -68,9 +68,14 @@ export class TenantConfigsService {
     const target = this.normaliseHost(url);
     if (!target) return null;
 
-    const matches = (await this.repo.find({ where: { isActive: true } })).filter(
-      (cfg) => this.normaliseHost(cfg.domainUrl) === target,
-    );
+    // Newest active config first, so both the env-match and the fallback
+    // are deterministic when a tenant has several configs on one domain.
+    const matches = (
+      await this.repo.find({
+        where: { isActive: true },
+        order: { createdAt: 'DESC' },
+      })
+    ).filter((cfg) => this.normaliseHost(cfg.domainUrl) === target);
     if (!matches.length) return null;
 
     const env = this.currentEnvironment();
