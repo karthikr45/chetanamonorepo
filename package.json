@@ -15,11 +15,17 @@
     "clean": "turbo run clean && rm -rf node_modules"
   },
   "devDependencies": {
-    "turbo": "^2.0.0"
+    "turbo": "^2.0.0",
+    "react": "19.2.3",
+    "react-dom": "19.2.3"
   },
   "pnpm": {
     "neverBuiltDependencies": [
       "react-native-screens"
-    ]
+    ],
+    "overrides": {
+      "@svbk/mobile-parent>react": "18.2.0",
+      "react-native>react": "18.2.0"
+    }
   }
 }
