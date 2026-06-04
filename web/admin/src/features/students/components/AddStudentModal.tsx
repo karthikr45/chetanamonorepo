@@ -36,7 +36,22 @@ const FALLBACK_TERMS = [
   "5th Term Fee",
 ];
 
+// Academic-year months in billing order (Apr → Mar).
+const FALLBACK_MONTHS = [
+  "April", "May", "June", "July", "August", "September",
+  "October", "November", "December", "January", "February", "March",
+];
+
 const ORDINAL = ["1st", "2nd", "3rd", "4th", "5th", "6th", "7th", "8th"] as const;
+
+interface MonthInput {
+  month: string;
+  enabled: boolean;
+  amount: string;
+  discount: string;
+  pickup: string;
+  drop: string;
+}
 
 interface Props {
   open: boolean;
@@ -75,11 +90,13 @@ export function AddStudentModal({
   const { user } = useAuth();
   const [tenantCode, setTenantCode] = useState<string | null>(null);
   const [tenantType, setTenantType] = useState<string | null>(null);
-  // Transport / monthly-billing fields.
+  // Transport / monthly-billing fields. Term-wise transport (edge case) uses
+  // a single boarding/drop point; monthly tenants set fees + locations
+  // per academic-year month in the grid below.
   const [pickupLocation, setPickupLocation] = useState("");
   const [dropLocation, setDropLocation] = useState("");
-  const [monthlyFee, setMonthlyFee] = useState("");
-  const [monthlyDiscount, setMonthlyDiscount] = useState("");
+  const [monthRows, setMonthRows] = useState<MonthInput[]>([]);
+  const [bulk, setBulk] = useState({ amount: "", discount: "", pickup: "", drop: "" });
 
   useEffect(() => {
     if (!open || !user?.tenantId) return;
@@ -112,6 +129,26 @@ export function AddStudentModal({
     () => termOptions.map((_, i) => ORDINAL[i] ?? `${i + 1}th`),
     [termOptions],
   );
+
+  const { options: monthOptions } = useMetadata("month", {
+    fallback: FALLBACK_MONTHS.map((v, i) => ({
+      value: v,
+      label: v,
+      displayOrder: i,
+      isActive: true,
+    })),
+  });
+  const MONTHS = useMemo(() => monthOptions.map((o) => o.value), [monthOptions]);
+
+  // Keep the month grid in sync with the resolved month vocabulary.
+  useEffect(() => {
+    setMonthRows((prev) => {
+      if (prev.length === MONTHS.length && prev.every((r, i) => r.month === MONTHS[i])) {
+        return prev;
+      }
+      return MONTHS.map((m) => ({ month: m, enabled: false, amount: "", discount: "", pickup: "", drop: "" }));
+    });
+  }, [MONTHS]);
 
   // Transport tenants collect a boarding/drop point; monthly-billing tenants
   // (transport by default) bill one Monthly Fee instead of per-term fees.
@@ -227,8 +264,8 @@ export function AddStudentModal({
     setTerms(TERMS.map(() => ({ enabled: false, amount: "", discount: "" })));
     setPickupLocation("");
     setDropLocation("");
-    setMonthlyFee("");
-    setMonthlyDiscount("");
+    setMonthRows(MONTHS.map((m) => ({ month: m, enabled: false, amount: "", discount: "", pickup: "", drop: "" })));
+    setBulk({ amount: "", discount: "", pickup: "", drop: "" });
     setLinkedIdentity(null);
     setOutstanding(null);
     setIdentitySearch({ name: "", phone: "", email: "" });
@@ -238,6 +275,24 @@ export function AddStudentModal({
 
   function setTerm(i: number, patch: Partial<TermInput>) {
     setTerms((curr) => curr.map((t, idx) => (idx === i ? { ...t, ...patch } : t)));
+  }
+
+  function setMonth(i: number, patch: Partial<MonthInput>) {
+    setMonthRows((curr) => curr.map((m, idx) => (idx === i ? { ...m, ...patch } : m)));
+  }
+
+  // Quick-fill: enable every month and copy the bulk defaults into each.
+  function applyBulkToAllMonths() {
+    setMonthRows((curr) =>
+      curr.map((m) => ({
+        ...m,
+        enabled: true,
+        amount: bulk.amount !== "" ? bulk.amount : m.amount,
+        discount: bulk.discount !== "" ? bulk.discount : m.discount,
+        pickup: bulk.pickup !== "" ? bulk.pickup : m.pickup,
+        drop: bulk.drop !== "" ? bulk.drop : m.drop,
+      })),
+    );
   }
 
   async function handleSubmit(e: React.FormEvent) {
@@ -252,8 +307,9 @@ export function AddStudentModal({
       }
     }
 
-    // Transport students need a boarding + drop point.
-    if (isTransport) {
+    // Term-wise transport (edge case) needs a single boarding + drop point.
+    // Monthly tenants collect boarding/drop per month in the grid below.
+    if (isTransport && !isMonthly) {
       if (!pickupLocation.trim()) {
         setError("Boarding point is required for transport students");
         return;
@@ -264,25 +320,49 @@ export function AddStudentModal({
       }
     }
 
-    // Monthly-billing tenants take a single Monthly Fee; everyone else uses
-    // the per-term grid.
-    let monthlyFeeNum: number | undefined;
-    let monthlyDiscountNum: number | undefined;
+    // Monthly-billing tenants bill per academic-year month; everyone else
+    // uses the per-term grid.
+    const payloadMonths: CreateStudentPayload["months"] = [];
     const payloadTerms: CreateStudentPayload["terms"] = [];
 
     if (isMonthly) {
-      monthlyFeeNum = Number(monthlyFee);
-      if (!Number.isFinite(monthlyFeeNum) || monthlyFeeNum <= 0) {
-        setError("Monthly fee must be a positive number");
-        return;
+      for (const r of monthRows) {
+        if (!r.enabled) continue;
+        const amount = Number(r.amount);
+        if (!Number.isFinite(amount) || amount <= 0) {
+          setError(`${r.month} fee must be a positive number`);
+          return;
+        }
+        const discount = r.discount === "" ? 0 : Number(r.discount);
+        if (!Number.isFinite(discount) || discount < 0) {
+          setError(`${r.month} discount must be 0 or more`);
+          return;
+        }
+        if (discount > amount) {
+          setError(`${r.month} discount cannot exceed the fee`);
+          return;
+        }
+        if (isTransport) {
+          if (!r.pickup.trim()) {
+            setError(`${r.month} boarding point is required`);
+            return;
+          }
+          if (!r.drop.trim()) {
+            setError(`${r.month} drop point is required`);
+            return;
+          }
+        }
+        payloadMonths.push({
+          month: r.month,
+          amount,
+          discount,
+          ...(isTransport
+            ? { pickupLocation: r.pickup.trim(), dropLocation: r.drop.trim() }
+            : {}),
+        });
       }
-      monthlyDiscountNum = monthlyDiscount === "" ? 0 : Number(monthlyDiscount);
-      if (!Number.isFinite(monthlyDiscountNum) || monthlyDiscountNum < 0) {
-        setError("Monthly discount must be 0 or more");
-        return;
-      }
-      if (monthlyDiscountNum > monthlyFeeNum) {
-        setError("Monthly discount cannot exceed the monthly fee");
+      if (payloadMonths.length === 0) {
+        setError("Enable at least one month and set its fee");
         return;
       }
     } else {
@@ -323,11 +403,12 @@ export function AddStudentModal({
         ...rest,
         schoolCode: tenantCode,
         identityId: linkedIdentity?.identity.id,
-        ...(isTransport
+        // Term-wise transport (edge) carries a single boarding/drop point.
+        ...(isTransport && !isMonthly
           ? { pickupLocation: pickupLocation.trim(), dropLocation: dropLocation.trim() }
           : {}),
         ...(isMonthly
-          ? { monthlyFee: monthlyFeeNum, monthlyDiscount: monthlyDiscountNum }
+          ? { months: payloadMonths }
           : { terms: payloadTerms.length ? payloadTerms : undefined }),
       });
       reset();
@@ -553,7 +634,7 @@ export function AddStudentModal({
             </Field>
           </div>
 
-          {isTransport && (
+          {isTransport && !isMonthly && (
             <>
               <SectionHeading>Transport</SectionHeading>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
@@ -570,19 +651,49 @@ export function AddStudentModal({
           {isMonthly ? (
             <>
               <SectionHeading>
-                Monthly fee{" "}
-                <span className="text-xs font-normal text-[var(--app-text-secondary)]">(billed every month, Apr–Mar)</span>
-              </SectionHeading>
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6 items-end">
-                <Field label="Monthly fee (₹)" required>
-                  <input type="number" min={0} value={monthlyFee} onChange={(e) => setMonthlyFee(e.target.value)} placeholder="3000" className="form-input" />
-                </Field>
-                <Field label="Monthly discount (₹)">
-                  <input type="number" min={0} value={monthlyDiscount} onChange={(e) => setMonthlyDiscount(e.target.value)} placeholder="0" className="form-input" />
-                </Field>
-                <span className="text-xs font-bold text-[var(--app-text-muted)] tabular-nums pb-2.5">
-                  {monthlyFee ? `Net ₹${Math.max(0, Number(monthlyFee) - Number(monthlyDiscount || 0)).toLocaleString("en-IN")}/mo × 12` : ""}
+                Monthly fees{" "}
+                <span className="text-xs font-normal text-[var(--app-text-secondary)]">
+                  (enable each month this student is billed for{isTransport ? "; boarding/drop can differ by month" : ""})
                 </span>
+              </SectionHeading>
+
+              {/* Quick fill — apply the same values to every month */}
+              <div className="mb-3 rounded-lg border border-dashed border-slate-200 bg-slate-50/60 p-3">
+                <div className={`grid grid-cols-1 gap-2 ${isTransport ? "sm:grid-cols-5" : "sm:grid-cols-3"}`}>
+                  <input type="number" min={0} value={bulk.amount} onChange={(e) => setBulk({ ...bulk, amount: e.target.value })} placeholder="Fee for all" className="form-input form-input-tight" />
+                  <input type="number" min={0} value={bulk.discount} onChange={(e) => setBulk({ ...bulk, discount: e.target.value })} placeholder="Discount for all" className="form-input form-input-tight" />
+                  {isTransport && (
+                    <>
+                      <input value={bulk.pickup} onChange={(e) => setBulk({ ...bulk, pickup: e.target.value })} placeholder="Boarding for all" className="form-input form-input-tight" />
+                      <input value={bulk.drop} onChange={(e) => setBulk({ ...bulk, drop: e.target.value })} placeholder="Drop for all" className="form-input form-input-tight" />
+                    </>
+                  )}
+                  <Button type="button" variant="secondary" onClick={applyBulkToAllMonths} className="cursor-pointer">
+                    Apply to all
+                  </Button>
+                </div>
+              </div>
+
+              <div className="flex flex-col gap-2 mb-6">
+                {monthRows.map((m, i) => (
+                  <div key={m.month} className="grid grid-cols-1 sm:grid-cols-12 gap-2 items-center p-3 rounded-lg bg-slate-50 border border-slate-100">
+                    <label className="flex items-center gap-2 sm:col-span-3 text-sm font-semibold text-[var(--app-text-primary)]">
+                      <input type="checkbox" checked={m.enabled} onChange={(e) => setMonth(i, { enabled: e.target.checked })} className="h-4 w-4 rounded border-slate-300 text-[var(--app-brand)] focus:ring-[var(--app-brand)]" />
+                      {m.month}
+                    </label>
+                    <input type="number" min={0} value={m.amount} onChange={(e) => setMonth(i, { amount: e.target.value })} placeholder="Fee" disabled={!m.enabled} className={`form-input form-input-tight disabled:opacity-50 ${isTransport ? "sm:col-span-2" : "sm:col-span-4"}`} />
+                    <input type="number" min={0} value={m.discount} onChange={(e) => setMonth(i, { discount: e.target.value })} placeholder="Discount" disabled={!m.enabled} className={`form-input form-input-tight disabled:opacity-50 ${isTransport ? "sm:col-span-2" : "sm:col-span-3"}`} />
+                    {isTransport && (
+                      <>
+                        <input value={m.pickup} onChange={(e) => setMonth(i, { pickup: e.target.value })} placeholder="Boarding" disabled={!m.enabled} className="form-input form-input-tight sm:col-span-2 disabled:opacity-50" />
+                        <input value={m.drop} onChange={(e) => setMonth(i, { drop: e.target.value })} placeholder="Drop" disabled={!m.enabled} className="form-input form-input-tight sm:col-span-2 disabled:opacity-50" />
+                      </>
+                    )}
+                    <span className={`text-right text-xs font-bold text-[var(--app-text-muted)] tabular-nums ${isTransport ? "sm:col-span-1" : "sm:col-span-2"}`}>
+                      {m.enabled && m.amount ? `₹${Math.max(0, Number(m.amount) - Number(m.discount || 0)).toLocaleString("en-IN")}` : ""}
+                    </span>
+                  </div>
+                ))}
               </div>
             </>
           ) : (

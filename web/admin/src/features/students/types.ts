@@ -18,7 +18,9 @@ export type TermFeeItem = {
   ddNumber?: string;
   ddFileName?: string;
   originalAmount?: number;
-  
+  /** Transport (monthly) only — this period's boarding / drop point. */
+  pickupLocation?: string | null;
+  dropLocation?: string | null;
 };
 
 /** Term fees keyed by term name e.g. "1st Term Fee" -> { amount, paymentStatus } */

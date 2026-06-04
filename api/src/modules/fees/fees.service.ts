@@ -268,6 +268,8 @@ export class FeesService {
         netAmount: net.toFixed(2),
         paidAmount: '0.00',
         paymentStatus: PaymentStatus.UNPAID,
+        pickupLocation: input.pickupLocation ?? null,
+        dropLocation: input.dropLocation ?? null,
       });
     });
 
@@ -279,6 +281,106 @@ export class FeesService {
     }
     this.logger.log(`Created ${saved} fees`);
     return saved;
+  }
+
+  /**
+   * Create-or-update per-period fees for one student from the Edit Student
+   * screen. Monthly (transport) tenants use this to add a month that wasn't
+   * billed yet, adjust a month's amount/discount, or change the boarding /
+   * drop point month-wise.
+   *
+   * For an existing fee, only the fields present in the edit are touched.
+   * Reducing the amount below what's already been paid is rejected (we never
+   * lose payment history). Missing periods are created when an amount is given.
+   */
+  async applyPeriodFeeEdits(
+    tenantId: string,
+    studentId: string,
+    academicYear: string,
+    edits: {
+      term: string;
+      amount?: number;
+      discount?: number;
+      pickupLocation?: string | null;
+      dropLocation?: string | null;
+    }[],
+  ): Promise<{ created: number; updated: number }> {
+    if (!edits.length) return { created: 0, updated: 0 };
+
+    return this.dataSource.transaction(async (manager) => {
+      const repo = manager.getRepository(Fee);
+      let created = 0;
+      let updated = 0;
+
+      for (const edit of edits) {
+        const fee = await repo.findOne({
+          where: {
+            tenantId,
+            studentId,
+            academicYear,
+            term: edit.term as Fee['term'],
+          },
+          lock: { mode: 'pessimistic_write' },
+        });
+
+        if (fee) {
+          if (edit.amount !== undefined) {
+            fee.originalAmount = Math.max(0, edit.amount).toFixed(2);
+          }
+          if (edit.discount !== undefined) {
+            fee.totalDiscount = Math.max(0, edit.discount).toFixed(2);
+          }
+          // Discount can't exceed the (possibly new) original amount.
+          if (Number(fee.totalDiscount) > Number(fee.originalAmount)) {
+            throw new BadRequestException(
+              `${edit.term}: discount cannot exceed the fee amount.`,
+            );
+          }
+          this.recomputeDerived(fee);
+          if (Number(fee.netAmount) < Number(fee.paidAmount) - 0.01) {
+            throw new BadRequestException(
+              `${edit.term}: amount cannot be reduced below the ₹${fee.paidAmount} already paid.`,
+            );
+          }
+          if (edit.pickupLocation !== undefined) {
+            fee.pickupLocation = edit.pickupLocation || null;
+          }
+          if (edit.dropLocation !== undefined) {
+            fee.dropLocation = edit.dropLocation || null;
+          }
+          await repo.save(fee);
+          updated++;
+        } else if (edit.amount !== undefined && edit.amount > 0) {
+          const discount = Math.min(
+            Math.max(0, edit.discount ?? 0),
+            edit.amount,
+          );
+          const net = Math.max(0, edit.amount - discount);
+          await repo.save(
+            repo.create({
+              tenantId,
+              academicYear,
+              studentId,
+              term: edit.term as Fee['term'],
+              originalAmount: edit.amount.toFixed(2),
+              totalPenalty: '0.00',
+              totalDiscount: discount.toFixed(2),
+              netAmount: net.toFixed(2),
+              paidAmount: '0.00',
+              paymentStatus: PaymentStatus.UNPAID,
+              pickupLocation: edit.pickupLocation ?? null,
+              dropLocation: edit.dropLocation ?? null,
+            }),
+          );
+          created++;
+        }
+      }
+
+      this.logger.log(
+        `Period-fee edits for student ${studentId}: ${created} created, ${updated} updated`,
+      );
+      return { created, updated };
+    });
   }
 
   // ──────────────── Penalty / discount ────────────────

@@ -125,6 +125,15 @@ export class Fee {
   })
   paymentStatus: PaymentStatus;
 
+  // ─── Transport (monthly tenants only) ────────────────────────────
+  // Boarding / drop point for THIS month's bill. Lets transport tenants
+  // change pickup/drop month-wise; null for term-wise (school/hostel) fees.
+  @Column({ name: 'pickup_location', type: 'varchar', length: 200, nullable: true })
+  pickupLocation: string | null;
+
+  @Column({ name: 'drop_location', type: 'varchar', length: 200, nullable: true })
+  dropLocation: string | null;
+
   @CreateDateColumn({ name: 'created_at', type: 'timestamptz' })
   createdAt: Date;
 

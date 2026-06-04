@@ -210,6 +210,8 @@ export class UploadService {
             term: r.term,
             originalAmount: r.amount,
             totalDiscount: r.discount,
+            pickupLocation: r.pickupLocation,
+            dropLocation: r.dropLocation,
           };
         });
 
@@ -263,10 +265,23 @@ export class UploadService {
       pickupLocation?: string | null;
       dropLocation?: string | null;
       terms?: { term: string; amount: number; discount?: number }[];
+      months?: {
+        month: string;
+        amount: number;
+        discount?: number;
+        pickupLocation?: string | null;
+        dropLocation?: string | null;
+      }[];
       monthlyFee?: number;
       monthlyDiscount?: number;
     },
   ) {
+    // Transport varies boarding/drop month-wise. The student row keeps a
+    // "current" snapshot — the first billed month's locations (else the
+    // student-level pickup/drop the caller passed).
+    const firstMonth = dto.months?.[0];
+    const studentPickup = firstMonth?.pickupLocation ?? dto.pickupLocation ?? null;
+    const studentDrop = firstMonth?.dropLocation ?? dto.dropLocation ?? null;
     // Resolve / create the identity OUTSIDE the transaction so a fresh
     // identity row is visible across all subsequent queries.
     let identityId = dto.identityId;
@@ -297,8 +312,8 @@ export class UploadService {
             section: dto.section.trim(),
             rollNo: dto.rollNo.trim(),
             imgUrl: dto.imgUrl ?? null,
-            pickupLocation: dto.pickupLocation ?? null,
-            dropLocation: dto.dropLocation ?? null,
+            pickupLocation: studentPickup,
+            dropLocation: studentDrop,
           },
         ],
         manager,
@@ -330,10 +345,21 @@ export class UploadService {
       );
 
       // Monthly-billing tenants (transport) bill one fee per academic-year
-      // month (Apr–Mar); term-wise tenants bill per term column. A monthly
-      // fee, when set, takes precedence over any term rows.
+      // month (Apr–Mar); term-wise tenants bill per term column. Precedence:
+      // per-month `months` → flat `monthlyFee` → `terms`.
       let feeInputs: CreateFeeInput[] = [];
-      if (dto.monthlyFee != null && dto.monthlyFee > 0) {
+      if (dto.months?.length) {
+        feeInputs = dto.months.map((m) => ({
+          tenantId,
+          academicYear: dto.academicYear.trim(),
+          studentId,
+          term: m.month as FeePeriod,
+          originalAmount: m.amount,
+          totalDiscount: m.discount ?? 0,
+          pickupLocation: m.pickupLocation ?? null,
+          dropLocation: m.dropLocation ?? null,
+        }));
+      } else if (dto.monthlyFee != null && dto.monthlyFee > 0) {
         feeInputs = Object.values(MonthType).map((month) => ({
           tenantId,
           academicYear: dto.academicYear.trim(),
@@ -341,6 +367,8 @@ export class UploadService {
           term: month,
           originalAmount: dto.monthlyFee as number,
           totalDiscount: dto.monthlyDiscount ?? 0,
+          pickupLocation: dto.pickupLocation ?? null,
+          dropLocation: dto.dropLocation ?? null,
         }));
       } else if (dto.terms?.length) {
         feeInputs = dto.terms.map((t) => ({

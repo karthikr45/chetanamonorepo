@@ -1,4 +1,11 @@
-import { EXCEL_COLUMNS, TERM_COLUMNS } from '../constants/excel.constants';
+import {
+  EXCEL_COLUMNS,
+  TERM_COLUMNS,
+  monthFeeCol,
+  monthDiscountCol,
+  monthPickupCol,
+  monthDropCol,
+} from '../constants/excel.constants';
 import { TermType, MonthType, FeePeriod } from '../../fees/entities/fee.entity';
 import {
   BILLING_MODE,
@@ -158,27 +165,14 @@ export function validateAndNormalise(
 
   const imgUrl = asTrimmedString(raw[EXCEL_COLUMNS.IMG_URL]) || null;
 
-  // Transport tenants maintain pickup/drop per student. Required for
-  // transport, ignored otherwise.
-  let pickupLocation: string | null = null;
-  let dropLocation: string | null = null;
-  if (ctx.isTransport) {
-    pickupLocation = asTrimmedString(raw[EXCEL_COLUMNS.PICKUP_LOCATION]) || null;
-    dropLocation = asTrimmedString(raw[EXCEL_COLUMNS.DROP_LOCATION]) || null;
-    if (!pickupLocation) {
-      errors.push({ field: EXCEL_COLUMNS.PICKUP_LOCATION, reason: 'required' });
-    }
-    if (!dropLocation) {
-      errors.push({ field: EXCEL_COLUMNS.DROP_LOCATION, reason: 'required' });
-    }
-  }
-
   // Fee periods differ by billing mode: term-wise tenants carry up to
-  // five term columns; monthly tenants carry one Monthly Fee that is
-  // billed for every month Apr–Mar.
+  // five term columns; monthly tenants carry one Fee (+ Discount, and for
+  // transport Pickup/Drop) column per academic-year month. Transport
+  // tenants vary the boarding/drop point month-wise, so pickup/drop are
+  // collected per month — not once per student.
   const periodValues =
     ctx.billingMode === BILLING_MODE.MONTHLY
-      ? collectMonthlyPeriods(raw, errors)
+      ? collectMonthlyPeriods(raw, ctx, errors)
       : collectTermPeriods(raw, errors);
 
   if (errors.length || periodValues.length === 0) {
@@ -198,8 +192,8 @@ export function validateAndNormalise(
       rollNo,
       academicYear,
       imgUrl,
-      pickupLocation,
-      dropLocation,
+      pickupLocation: t.pickupLocation ?? null,
+      dropLocation: t.dropLocation ?? null,
       term: t.term,
       amount: t.amount,
       discount: t.discount,
@@ -211,6 +205,9 @@ interface PeriodValue {
   term: FeePeriod;
   amount: number;
   discount: number;
+  /** Transport (monthly) only — this month's boarding / drop point. */
+  pickupLocation?: string | null;
+  dropLocation?: string | null;
 }
 
 /** Term-wise: one entry per non-empty term column. */
@@ -263,39 +260,74 @@ function collectTermPeriods(
   return out;
 }
 
-/** Monthly: one Monthly Fee expanded into a bill for every month. */
+/**
+ * Monthly: one entry per academic-year month that carries a fee. Each month
+ * has its own Fee, Discount and — for transport — Pickup/Drop columns, so
+ * amounts and boarding/drop points can vary month-wise. Months left blank
+ * are simply not billed.
+ */
 function collectMonthlyPeriods(
   raw: Record<string, unknown>,
+  ctx: BillingContext,
   errors: FieldError[],
 ): PeriodValue[] {
-  const amount = toPositiveAmount(raw[EXCEL_COLUMNS.MONTHLY_FEE]);
-  if (amount === null) {
-    errors.push({
-      field: EXCEL_COLUMNS.MONTHLY_FEE,
-      reason: 'must be a positive number',
-    });
-    return [];
+  const out: PeriodValue[] = [];
+
+  for (const month of MONTH_VALUES) {
+    const feeCol = monthFeeCol(month);
+    const feeRaw = raw[feeCol];
+    // Blank month → not billed this month. Skip silently.
+    if (feeRaw === undefined || feeRaw === null || feeRaw === '') continue;
+
+    const amount = toPositiveAmount(feeRaw);
+    if (amount === null) {
+      errors.push({ field: feeCol, reason: 'must be a positive number' });
+      continue;
+    }
+
+    const discountCol = monthDiscountCol(month);
+    const discountRaw = raw[discountCol];
+    const discount =
+      discountRaw === undefined || discountRaw === null || discountRaw === ''
+        ? 0
+        : toNonNegativeAmount(discountRaw);
+    if (discount === null) {
+      errors.push({ field: discountCol, reason: 'must be a non-negative number' });
+      continue;
+    }
+    if (discount > amount) {
+      errors.push({
+        field: discountCol,
+        reason: `discount (${discount}) exceeds ${month} fee (${amount})`,
+      });
+      continue;
+    }
+
+    // Transport varies boarding/drop month-wise; required when this month
+    // is billed. Non-transport monthly tenants (e.g. hostel) skip these.
+    let pickupLocation: string | null = null;
+    let dropLocation: string | null = null;
+    if (ctx.isTransport) {
+      pickupLocation = asTrimmedString(raw[monthPickupCol(month)]) || null;
+      dropLocation = asTrimmedString(raw[monthDropCol(month)]) || null;
+      if (!pickupLocation) {
+        errors.push({ field: monthPickupCol(month), reason: 'required' });
+      }
+      if (!dropLocation) {
+        errors.push({ field: monthDropCol(month), reason: 'required' });
+      }
+    }
+
+    out.push({ term: month, amount, discount, pickupLocation, dropLocation });
   }
-  const discountRaw = raw[EXCEL_COLUMNS.MONTHLY_DISCOUNT];
-  const discount =
-    discountRaw === undefined || discountRaw === null || discountRaw === ''
-      ? 0
-      : toNonNegativeAmount(discountRaw);
-  if (discount === null) {
+
+  if (out.length === 0) {
     errors.push({
-      field: EXCEL_COLUMNS.MONTHLY_DISCOUNT,
-      reason: 'must be a non-negative number',
+      field: 'Monthly Fee',
+      reason: 'at least one month fee column must be set',
     });
-    return [];
   }
-  if (discount > amount) {
-    errors.push({
-      field: EXCEL_COLUMNS.MONTHLY_DISCOUNT,
-      reason: `discount (${discount}) exceeds monthly fee (${amount})`,
-    });
-    return [];
-  }
-  return MONTH_VALUES.map((month) => ({ term: month, amount, discount }));
+  return out;
 }
 
 function toNonNegativeAmount(value: unknown): number | null {

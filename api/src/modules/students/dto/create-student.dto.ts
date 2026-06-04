@@ -14,7 +14,7 @@ import {
   Min,
   ValidateNested,
 } from 'class-validator';
-import { TermType } from '../../fees/entities/fee.entity';
+import { TermType, MonthType } from '../../fees/entities/fee.entity';
 import {
   SCHOOL_CODE_REGEX,
   SCHOOL_CODE_MESSAGE,
@@ -35,6 +35,40 @@ export class CreateStudentTermDto {
   @IsInt()
   @Min(0)
   discount?: number;
+}
+
+/**
+ * One academic-year month's bill for a monthly (transport) tenant. Each
+ * month carries its own fee, concession and — for transport — boarding /
+ * drop point, so all three can vary month-wise.
+ */
+export class CreateStudentMonthDto {
+  @ApiProperty({ enum: MonthType, example: MonthType.APRIL })
+  @IsEnum(MonthType)
+  month: MonthType;
+
+  @ApiProperty({ example: 3000, description: 'This month\'s fee (rupees)' })
+  @IsInt()
+  @Min(0)
+  amount: number;
+
+  @ApiPropertyOptional({ example: 0, description: 'This month\'s concession (rupees)' })
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  discount?: number;
+
+  @ApiPropertyOptional({ example: 'Kukatpally Bus Stop', description: 'This month\'s boarding point (transport).' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(200)
+  pickupLocation?: string | null;
+
+  @ApiPropertyOptional({ example: 'School Gate', description: 'This month\'s drop point (transport).' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(200)
+  dropLocation?: string | null;
 }
 
 export class CreateStudentDto {
@@ -109,8 +143,9 @@ export class CreateStudentDto {
   @ApiPropertyOptional({
     example: 3000,
     description:
-      'Monthly fee (transport / monthly-billing tenants). When set, one fee ' +
-      'is created for every month of the academic year (Apr–Mar).',
+      'Flat monthly fee (transport / monthly-billing tenants). When set, one ' +
+      'fee is created for every month of the academic year (Apr–Mar). Prefer ' +
+      '`months` for per-month amounts / boarding points.',
   })
   @IsOptional()
   @IsInt()
@@ -122,6 +157,20 @@ export class CreateStudentDto {
   @IsInt()
   @Min(0)
   monthlyDiscount?: number;
+
+  @ApiPropertyOptional({
+    type: [CreateStudentMonthDto],
+    description:
+      'Per-month bills (transport / monthly tenants). One entry per ' +
+      'academic-year month the student is billed for. Each carries its own ' +
+      'amount, discount and boarding/drop point. Takes precedence over ' +
+      '`monthlyFee`.',
+  })
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => CreateStudentMonthDto)
+  months?: CreateStudentMonthDto[];
 
   @ApiPropertyOptional({
     description:

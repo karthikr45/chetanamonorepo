@@ -53,6 +53,9 @@ export interface CreateFeeInput {
   originalAmount: number;
   /** Optional concession (sibling/staff/EWS/scholarship). Defaults to 0. */
   totalDiscount?: number;
+  /** Transport (monthly) only — this month's boarding / drop point. */
+  pickupLocation?: string | null;
+  dropLocation?: string | null;
 }
 
 /** Used internally by the upload validator. */

@@ -40,10 +40,9 @@ import { ListStudentsQueryDto } from './dto/list.dto';
 import { CreateStudentDto } from './dto/create-student.dto';
 import {
   COLUMN_DESCRIPTIONS,
-  COLUMN_DESCRIPTIONS_MONTHLY,
-  MONTHLY_FEE_COLUMNS,
-  SAMPLE_ROWS_MONTHLY,
-  TRANSPORT_COLUMNS,
+  buildMonthlyColumnDescriptions,
+  buildMonthlyFeeColumns,
+  buildMonthlySampleRows,
   EXCEL_COLUMNS,
   MAX_UPLOAD_SIZE_BYTES,
   REQUIRED_STUDENT_COLUMNS,
@@ -61,7 +60,7 @@ import { RolesGuard } from '../../common/guards/roles.guard';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { FeesService } from '../fees/fees.service';
 import { PaymentType } from '../fees/entities/fee-payment.entity';
-import { TermType } from '../fees/entities/fee.entity';
+import { TermType, MonthType } from '../fees/entities/fee.entity';
 
 
 
@@ -123,13 +122,11 @@ export class StudentsController {
     const code = tenant?.code ?? 'your-school-code';
     const billing = resolveBillingContext(tenant?.type, tenant?.billingMode);
 
-    const feeColumns =
-      billing.billingMode === BILLING_MODE.MONTHLY
-        ? [
-            ...MONTHLY_FEE_COLUMNS,
-            ...(billing.isTransport ? TRANSPORT_COLUMNS : []),
-          ]
-        : TERM_DEFINITIONS.flatMap((t) => [t.feeCol, t.discountCol]);
+    const isMonthly = billing.billingMode === BILLING_MODE.MONTHLY;
+
+    const feeColumns = isMonthly
+      ? buildMonthlyFeeColumns(billing.isTransport)
+      : TERM_DEFINITIONS.flatMap((t) => [t.feeCol, t.discountCol]);
 
     const headers: string[] = [
       ...REQUIRED_STUDENT_COLUMNS,
@@ -137,18 +134,16 @@ export class StudentsController {
       ...feeColumns,
     ];
 
-    const sampleRows =
-      (
-        billing.billingMode === BILLING_MODE.MONTHLY ? SAMPLE_ROWS_MONTHLY : SAMPLE_ROWS
-      ).map(row => ({
-        ...row,
-        "Code": code,
-      }));
- 
+    const sampleRows = (
+      isMonthly ? buildMonthlySampleRows(billing.isTransport) : SAMPLE_ROWS
+    ).map((row) => ({
+      ...row,
+      Code: code,
+    }));
 
     const descriptions = (
-      billing.billingMode === BILLING_MODE.MONTHLY
-        ? COLUMN_DESCRIPTIONS_MONTHLY
+      isMonthly
+        ? buildMonthlyColumnDescriptions(billing.isTransport)
         : COLUMN_DESCRIPTIONS
     ).filter((d) => headers.includes(d.column));
 
@@ -521,9 +516,67 @@ export class StudentsController {
       studentUpdate,
     );
 
-    // Apply fee payment deltas (we only ever ADD payments; cannot reduce history).
+    const isTermKey = (k: string) =>
+      Object.values(TermType).includes(k as TermType);
+    const isMonthKey = (k: string) =>
+      Object.values(MonthType).includes(k as MonthType);
+
     if (dto.termFees && Object.keys(dto.termFees).length) {
       const student = await this.studentsService.findOneOrFail(tenantId, id);
+
+      // First, month-wise fee edits (monthly/transport tenants): create a
+      // month that wasn't billed yet, adjust its amount/discount, or change
+      // its boarding/drop point. Runs before payment deltas so a freshly
+      // created month can also receive a payment in the same request.
+      const periodEdits: {
+        term: string;
+        amount?: number;
+        discount?: number;
+        pickupLocation?: string | null;
+        dropLocation?: string | null;
+      }[] = [];
+      for (const [periodKey, raw] of Object.entries(dto.termFees)) {
+        if (!isMonthKey(periodKey)) continue;
+        const amountRaw = raw?.originalAmount ?? raw?.amount;
+        const amount =
+          amountRaw === null || amountRaw === undefined || amountRaw === ''
+            ? undefined
+            : Number(amountRaw);
+        const discountRaw = raw?.totalDiscount ?? raw?.discount;
+        const discount =
+          discountRaw === null || discountRaw === undefined || discountRaw === ''
+            ? undefined
+            : Number(discountRaw);
+        const edit: (typeof periodEdits)[number] = { term: periodKey };
+        if (amount !== undefined && Number.isFinite(amount)) edit.amount = amount;
+        if (discount !== undefined && Number.isFinite(discount))
+          edit.discount = discount;
+        if (typeof raw?.pickupLocation === 'string')
+          edit.pickupLocation = raw.pickupLocation.trim() || null;
+        if (typeof raw?.dropLocation === 'string')
+          edit.dropLocation = raw.dropLocation.trim() || null;
+        // Only enqueue when there's something to create/update beyond payment.
+        if (
+          edit.amount !== undefined ||
+          edit.discount !== undefined ||
+          edit.pickupLocation !== undefined ||
+          edit.dropLocation !== undefined
+        ) {
+          periodEdits.push(edit);
+        }
+      }
+      if (periodEdits.length) {
+        await this.feesService.applyPeriodFeeEdits(
+          tenantId,
+          id,
+          student.academicYear,
+          periodEdits,
+        );
+      }
+
+      // Apply fee payment deltas (we only ever ADD payments; cannot reduce
+      // history). Accepts both term names (school/hostel) and month names
+      // (monthly/transport tenants).
       const summaries = await this.studentFeesService.getFeesForStudent(
         tenantId,
         id,
@@ -533,7 +586,7 @@ export class StudentsController {
       for (const s of summaries) byTerm.set(s.term, s);
 
       for (const [termKey, raw] of Object.entries(dto.termFees)) {
-        if (!Object.values(TermType).includes(termKey as TermType)) continue;
+        if (!isTermKey(termKey) && !isMonthKey(termKey)) continue;
         const summary = byTerm.get(termKey);
         if (!summary) continue;
 

@@ -25,13 +25,9 @@ export const EXCEL_COLUMNS = {
   ROLL_NO: 'Roll No',
   IMG_URL: 'imgUrl',
 
-  // Monthly billing (used when the tenant's billing mode is monthly,
-  // e.g. transport). One amount is billed for each month Apr–Mar.
-  MONTHLY_FEE: 'Monthly Fee',
-  MONTHLY_DISCOUNT: 'Monthly Discount',
-  // Transport-only: pickup/drop maintained per student.
-  PICKUP_LOCATION: 'Pickup Location',
-  DROP_LOCATION: 'Drop Location',
+  // Monthly billing (transport): each academic-year month has its own
+  // Fee / Discount (and, for transport, Pickup / Drop) column — see
+  // monthFeeCol(), buildMonthlyFeeColumns(), etc. below.
 
   // Fees per term — original amount
   TERM_1: '1st Term Fee',
@@ -86,17 +82,78 @@ export const TERM_DEFINITIONS = [
   { feeCol: EXCEL_COLUMNS.TERM_5, discountCol: EXCEL_COLUMNS.TERM_5_DISCOUNT },
 ] as const;
 
-/** Fee columns for a monthly-billing tenant. */
-export const MONTHLY_FEE_COLUMNS = [
-  EXCEL_COLUMNS.MONTHLY_FEE,
-  EXCEL_COLUMNS.MONTHLY_DISCOUNT,
+// ─── Per-month columns (monthly-billing tenants) ───────────────────
+// Monthly tenants bill each academic-year month (Apr–Mar) independently,
+// so the Excel carries one Fee + Discount column per month — and, for
+// transport, one Pickup + Drop column per month so boarding/drop points
+// can change month-wise.
+
+/** Academic-year months in billing order (Apr → Mar). */
+export const MONTH_ORDER = [
+  'April', 'May', 'June', 'July', 'August', 'September',
+  'October', 'November', 'December', 'January', 'February', 'March',
 ] as const;
 
-/** Extra columns shown only for transport tenants. */
-export const TRANSPORT_COLUMNS = [
-  EXCEL_COLUMNS.PICKUP_LOCATION,
-  EXCEL_COLUMNS.DROP_LOCATION,
-] as const;
+export type MonthName = (typeof MONTH_ORDER)[number];
+
+export const monthFeeCol = (m: string) => `${m} Fee`;
+export const monthDiscountCol = (m: string) => `${m} Discount`;
+export const monthPickupCol = (m: string) => `${m} Pickup`;
+export const monthDropCol = (m: string) => `${m} Drop`;
+
+/**
+ * Ordered fee columns for a monthly tenant. For each month: Fee, Discount,
+ * and (transport only) Pickup, Drop.
+ */
+export function buildMonthlyFeeColumns(isTransport: boolean): string[] {
+  return MONTH_ORDER.flatMap((m) => [
+    monthFeeCol(m),
+    monthDiscountCol(m),
+    ...(isTransport ? [monthPickupCol(m), monthDropCol(m)] : []),
+  ]);
+}
+
+/** One realistic sample row for the monthly template. */
+export function buildMonthlySampleRows(isTransport: boolean): SampleRow[] {
+  const base: SampleRow = {
+    [EXCEL_COLUMNS.SCHOOL_CODE]: 'SVBK-MAIN',
+    [EXCEL_COLUMNS.ACADEMIC_YEAR]: '2026-2027',
+    [EXCEL_COLUMNS.ADMISSION]: '1000',
+    [EXCEL_COLUMNS.NAME]: 'Arjun Kumar',
+    [EXCEL_COLUMNS.EMAIL]: 'arjun@example.com',
+    [EXCEL_COLUMNS.PHONE]: '+919876543210',
+    [EXCEL_COLUMNS.CLASS]: '7',
+    [EXCEL_COLUMNS.SECTION]: 'A',
+    [EXCEL_COLUMNS.ROLL_NO]: '1',
+    [EXCEL_COLUMNS.IMG_URL]: '',
+  };
+  for (const m of MONTH_ORDER) {
+    base[monthFeeCol(m)] = 3000;
+    base[monthDiscountCol(m)] = 0;
+    if (isTransport) {
+      base[monthPickupCol(m)] = 'Kukatpally Bus Stop';
+      base[monthDropCol(m)] = 'School Main Gate';
+    }
+  }
+  return [base];
+}
+
+/** Per-column help for the monthly template's Instructions sheet. */
+export function buildMonthlyColumnDescriptions(
+  isTransport: boolean,
+): { column: string; required: 'Yes' | 'No'; example: string; notes: string }[] {
+  const monthRows = MONTH_ORDER.flatMap((m) => [
+    { column: monthFeeCol(m),      required: 'No' as const, example: '3000', notes: `${m} fee in INR. Fill the months this student is billed for; leave others blank.` },
+    { column: monthDiscountCol(m), required: 'No' as const, example: '0',    notes: `${m} concession. Cannot exceed the ${m} fee.` },
+    ...(isTransport
+      ? [
+          { column: monthPickupCol(m), required: 'No' as const, example: 'Kukatpally', notes: `${m} boarding point. Required for transport when ${m} fee is set.` },
+          { column: monthDropCol(m),   required: 'No' as const, example: 'School Gate', notes: `${m} drop point. Required for transport when ${m} fee is set.` },
+        ]
+      : []),
+  ]);
+  return [...MONTHLY_DESCRIPTION_HEADER, ...monthRows];
+}
 
 export const MAX_UPLOAD_SIZE_BYTES = 20 * 1024 * 1024; // 20 MB
 export const MAX_UPLOAD_ROWS = 10_000;
@@ -226,30 +283,6 @@ export const SAMPLE_ROWS: SampleRow[] = [
   },
 ];
 
-/**
- * Sample rows for a monthly-billing tenant (hostel/transport). The
- * single Monthly Fee is billed for each month Apr–Mar. Transport rows
- * also carry pickup/drop locations.
- */
-export const SAMPLE_ROWS_MONTHLY: SampleRow[] = [
-  {
-    [EXCEL_COLUMNS.SCHOOL_CODE]: 'SVBK-MAIN',
-    [EXCEL_COLUMNS.ACADEMIC_YEAR]: '2026-2027',
-    [EXCEL_COLUMNS.ADMISSION]: '1000',
-    [EXCEL_COLUMNS.NAME]: 'Arjun Kumar',
-    [EXCEL_COLUMNS.EMAIL]: 'arjun@example.com',
-    [EXCEL_COLUMNS.PHONE]: '+919876543210',
-    [EXCEL_COLUMNS.CLASS]: '7',
-    [EXCEL_COLUMNS.SECTION]: 'A',
-    [EXCEL_COLUMNS.ROLL_NO]: '1',
-    [EXCEL_COLUMNS.IMG_URL]: '',
-    [EXCEL_COLUMNS.MONTHLY_FEE]: 3000,
-    [EXCEL_COLUMNS.MONTHLY_DISCOUNT]: 0,
-    [EXCEL_COLUMNS.PICKUP_LOCATION]: 'Kukatpally Bus Stop',
-    [EXCEL_COLUMNS.DROP_LOCATION]: 'School Main Gate',
-  },
-];
-
 /** Per-column help text shown on the Instructions sheet of the template. */
 export const COLUMN_DESCRIPTIONS: { column: string; required: 'Yes' | 'No'; example: string; notes: string }[] = [
   { column: EXCEL_COLUMNS.SCHOOL_CODE,      required: 'Yes', example: 'SVBK-MAIN',      notes: 'School code. Shared across the school/hostel/transport tenants for the same institution.' },
@@ -274,8 +307,11 @@ export const COLUMN_DESCRIPTIONS: { column: string; required: 'Yes' | 'No'; exam
   { column: EXCEL_COLUMNS.TERM_5_DISCOUNT,  required: 'No',  example: '',               notes: '5th-term concession.' },
 ];
 
-/** Help text for the monthly-billing template (hostel/transport). */
-export const COLUMN_DESCRIPTIONS_MONTHLY: { column: string; required: 'Yes' | 'No'; example: string; notes: string }[] = [
+/**
+ * Shared identity-column help rows for the monthly template. The per-month
+ * fee/discount/pickup/drop rows are appended by buildMonthlyColumnDescriptions.
+ */
+const MONTHLY_DESCRIPTION_HEADER: { column: string; required: 'Yes' | 'No'; example: string; notes: string }[] = [
   { column: EXCEL_COLUMNS.SCHOOL_CODE,      required: 'Yes', example: 'SVBK-MAIN',      notes: 'School code. Same as the school tenant for this institution.' },
   { column: EXCEL_COLUMNS.ACADEMIC_YEAR,    required: 'Yes', example: '2025-2026',      notes: 'Format YYYY-YYYY, end year = start year + 1.' },
   { column: EXCEL_COLUMNS.ADMISSION,        required: 'Yes', example: 'ADM-2024-001',   notes: 'Same admission number as the school record (links the person).' },
@@ -286,8 +322,4 @@ export const COLUMN_DESCRIPTIONS_MONTHLY: { column: string; required: 'Yes' | 'N
   { column: EXCEL_COLUMNS.SECTION,          required: 'Yes', example: 'A',              notes: 'Section.' },
   { column: EXCEL_COLUMNS.ROLL_NO,          required: 'Yes', example: '1',              notes: 'Roll number.' },
   { column: EXCEL_COLUMNS.IMG_URL,          required: 'No',  example: '',               notes: 'Optional photo URL.' },
-  { column: EXCEL_COLUMNS.MONTHLY_FEE,      required: 'Yes', example: '3000',           notes: 'Monthly fee in INR — billed for each month Apr–Mar.' },
-  { column: EXCEL_COLUMNS.MONTHLY_DISCOUNT, required: 'No',  example: '0',              notes: 'Monthly concession. Cannot exceed the monthly fee.' },
-  { column: EXCEL_COLUMNS.PICKUP_LOCATION,  required: 'No',  example: 'Kukatpally',     notes: 'Transport only. Required for transport tenants.' },
-  { column: EXCEL_COLUMNS.DROP_LOCATION,    required: 'No',  example: 'School Gate',    notes: 'Transport only. Required for transport tenants.' },
 ];

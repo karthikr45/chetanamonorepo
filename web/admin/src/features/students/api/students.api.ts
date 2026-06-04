@@ -135,6 +135,16 @@ export interface CreateStudentTermPayload {
   discount?: number;
 }
 
+/** One academic-year month's bill for a monthly (transport) tenant. */
+export interface CreateStudentMonthPayload {
+  month: string;
+  amount: number;
+  discount?: number;
+  /** Transport only — this month's boarding / drop point. */
+  pickupLocation?: string | null;
+  dropLocation?: string | null;
+}
+
 export interface CreateStudentPayload {
   /** Historically "branch" on the UI; sent to the API as `schoolCode`. */
   schoolCode?: string;
@@ -158,6 +168,8 @@ export interface CreateStudentPayload {
   dropLocation?: string | null;
   monthlyFee?: number;
   monthlyDiscount?: number;
+  /** Per-month bills (preferred over monthlyFee for monthly tenants). */
+  months?: CreateStudentMonthPayload[];
 }
 
 export async function createStudentApi(payload: CreateStudentPayload): Promise<unknown> {

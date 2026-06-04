@@ -71,7 +71,18 @@ function parseFeesArray(fees: unknown): Record<string, TermFeeItem> {
           ? "Unpaid"
           : rawStatus;
 
+    const feeId = typeof fee.feeId === "string" ? fee.feeId : typeof fee.id === "string" ? fee.id : undefined;
+    const pickupLocation =
+      (fee.pickupLocation as string | null | undefined) ??
+      (fee.pickup_location as string | null | undefined) ??
+      null;
+    const dropLocation =
+      (fee.dropLocation as string | null | undefined) ??
+      (fee.drop_location as string | null | undefined) ??
+      null;
+
     out[term] = {
+      feeId,
       amount,
       originalAmount,
       totalDiscount,
@@ -81,6 +92,8 @@ function parseFeesArray(fees: unknown): Record<string, TermFeeItem> {
       paymentStatus,
       paymentDate: latestPaymentDate,
       paymentDates,
+      pickupLocation,
+      dropLocation,
     };
   }
   return out;

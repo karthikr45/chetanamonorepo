@@ -1,9 +1,16 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { SelectMenu } from "@/components/common";
 import { useAuth } from "@/features/auth";
+import { useMetadata } from "@/features/system-metadata/hooks/useMetadata";
 import type { StudentFeeRow, TermFeeItem } from "@/features/students/types";
+
+// Academic-year months in billing order (Apr → Mar).
+const FALLBACK_MONTHS = [
+  "April", "May", "June", "July", "August", "September",
+  "October", "November", "December", "January", "February", "March",
+];
 
 export interface EditStudentFormProps {
   student: StudentFeeRow;
@@ -54,6 +61,22 @@ export function EditStudentForm({ student, formId, onSubmit, onStatusChangeToPai
     (user?.tenantType ?? "").toLowerCase() === "transport" ||
     form.pickupLocation != null ||
     form.dropLocation != null;
+  // Monthly-billing tenants (transport by default) bill per academic-year
+  // month, not per term — show all 12 months so admins can add a month that
+  // wasn't billed yet and change boarding/drop month-wise.
+  const isMonthly =
+    (user?.billingMode ?? "").toLowerCase() === "monthly" ||
+    ((user?.tenantType ?? "").toLowerCase() === "transport" && !user?.billingMode);
+
+  const { options: monthOpts } = useMetadata("month", {
+    fallback: FALLBACK_MONTHS.map((v, i) => ({
+      value: v,
+      label: v,
+      displayOrder: i,
+      isActive: true,
+    })),
+  });
+  const MONTHS = useMemo(() => monthOpts.map((o) => o.value), [monthOpts]);
 
   const set = (field: keyof StudentFeeRow, value: string) =>
     setForm((prev) => ({ ...prev, [field]: value }));
@@ -92,11 +115,18 @@ export function EditStudentForm({ student, formId, onSubmit, onStatusChangeToPai
     onSubmit(form);
   };
 
-  const termNames = Object.keys(form.termFees).sort((a, b) => {
-    const nA = parseInt(a, 10) || 0;
-    const nB = parseInt(b, 10) || 0;
-    return nA !== nB ? nA - nB : a.localeCompare(b);
-  });
+  // Monthly tenants show every academic-year month (Apr→Mar) so a not-yet
+  // billed month can be added inline; term-wise tenants show the terms that
+  // already exist, in ordinal order.
+  const periodNames = isMonthly
+    ? MONTHS
+    : Object.keys(form.termFees).sort((a, b) => {
+        const nA = parseInt(a, 10) || 0;
+        const nB = parseInt(b, 10) || 0;
+        return nA !== nB ? nA - nB : a.localeCompare(b);
+      });
+  const periodLabel = isMonthly ? "Monthly Fees" : "Term Fees";
+  const emptyItem: TermFeeItem = { amount: 0, paidAmount: 0, penaltyAmount: 0, paymentStatus: "Unpaid" };
 
   return (
     <form id={formId} onSubmit={handleSubmit} className="space-y-5">
@@ -122,7 +152,7 @@ export function EditStudentForm({ student, formId, onSubmit, onStatusChangeToPai
         <FieldGroup label="Email">
           <input type="email" value={form.email} onChange={(e) => set("email", e.target.value)} className={inputClass} style={inputStyle} />
         </FieldGroup>
-        {isTransport && (
+        {isTransport && !isMonthly && (
           <>
             <FieldGroup label="Boarding Point">
               <input type="text" value={form.pickupLocation ?? ""} onChange={(e) => set("pickupLocation", e.target.value)} placeholder="e.g. Kukatpally Bus Stop" className={inputClass} style={inputStyle} />
@@ -134,28 +164,34 @@ export function EditStudentForm({ student, formId, onSubmit, onStatusChangeToPai
         )}
       </div>
 
-      {termNames.length > 0 && (
+      {periodNames.length > 0 && (
         <div className="border-t pt-4" style={{ borderColor: "var(--app-divider)" }}>
-          <h3 className="mb-3 text-sm font-semibold uppercase tracking-wide" style={{ color: "var(--app-text-secondary)" }}>
-            Term Fees
+          <h3 className="mb-1 text-sm font-semibold uppercase tracking-wide" style={{ color: "var(--app-text-secondary)" }}>
+            {periodLabel}
           </h3>
+          {isMonthly && (
+            <p className="mb-3 text-xs" style={{ color: "var(--app-text-secondary)" }}>
+              Set an amount on a month to add it to this student&apos;s bill.
+              {isTransport ? " Boarding/drop can differ by month." : ""}
+            </p>
+          )}
           <div className="space-y-3">
-            {termNames.map((termName) => {
-              const term = form.termFees[termName];
+            {periodNames.map((periodName) => {
+              const term = form.termFees[periodName] ?? emptyItem;
               return (
                 <div
-                  key={termName}
-                  className="grid grid-cols-1 gap-3 rounded-xl border p-3 sm:grid-cols-2 lg:grid-cols-4 lg:items-end"
+                  key={periodName}
+                  className={`grid grid-cols-1 gap-3 rounded-xl border p-3 sm:grid-cols-2 lg:items-end ${isMonthly && isTransport ? "lg:grid-cols-6" : "lg:grid-cols-4"}`}
                   style={{ borderColor: "var(--app-divider)", backgroundColor: "var(--app-search-bg)" }}
                 >
                   <div className="flex items-end text-sm font-medium lg:pb-2.5" style={{ color: "var(--app-text-primary)" }}>
-                    {termName}
+                    {periodName}
                   </div>
                   <FieldGroup label="Amount">
                     <input
                       type="number"
-                      value={term.amount}
-                      onChange={(e) => setTermFee(termName, "amount", Number(e.target.value))}
+                      value={term.originalAmount ?? term.amount}
+                      onChange={(e) => setTermFee(periodName, "originalAmount", Number(e.target.value))}
                       className={inputClass}
                       style={inputStyle}
                     />
@@ -164,25 +200,16 @@ export function EditStudentForm({ student, formId, onSubmit, onStatusChangeToPai
                     <input
                       type="number"
                       value={term.paidAmount}
-                      onChange={(e) => setTermFee(termName, "paidAmount", Number(e.target.value))}
+                      onChange={(e) => setTermFee(periodName, "paidAmount", Number(e.target.value))}
                       className={inputClass}
                       style={inputStyle}
                     />
                   </FieldGroup>
-                  {/* <FieldGroup label="Paid Amount">
-                    <input
-                      type="number"
-                      value={term.paidAmount}
-                      onChange={(e) => setTermFee(termName, "paidAmount", Number(e.target.value))}
-                      className={inputClass}
-                      style={inputStyle}
-                    />
-                  </FieldGroup> */}
                   <FieldGroup label="Status">
                     <SelectMenu
-                      aria-label={`${termName} payment status`}
+                      aria-label={`${periodName} payment status`}
                       value={term.paymentStatus || "Unpaid"}
-                      onChange={(value) => setTermFee(termName, "paymentStatus", value)}
+                      onChange={(value) => setTermFee(periodName, "paymentStatus", value)}
                       usePortal={false}
                       className="w-full"
                       options={[
@@ -192,6 +219,30 @@ export function EditStudentForm({ student, formId, onSubmit, onStatusChangeToPai
                       ]}
                     />
                   </FieldGroup>
+                  {isMonthly && isTransport && (
+                    <>
+                      <FieldGroup label="Boarding">
+                        <input
+                          type="text"
+                          value={term.pickupLocation ?? ""}
+                          onChange={(e) => setTermFee(periodName, "pickupLocation", e.target.value)}
+                          placeholder="e.g. Kukatpally"
+                          className={inputClass}
+                          style={inputStyle}
+                        />
+                      </FieldGroup>
+                      <FieldGroup label="Drop">
+                        <input
+                          type="text"
+                          value={term.dropLocation ?? ""}
+                          onChange={(e) => setTermFee(periodName, "dropLocation", e.target.value)}
+                          placeholder="e.g. School Gate"
+                          className={inputClass}
+                          style={inputStyle}
+                        />
+                      </FieldGroup>
+                    </>
+                  )}
                 </div>
               );
             })}

@@ -25,6 +25,9 @@ export interface StudentFeeSummary {
   paidAmount: string;
   remainingAmount: string;
   paymentStatus: string;
+  /** Transport (monthly) only — this month's boarding / drop point. */
+  pickupLocation: string | null;
+  dropLocation: string | null;
   payments: FeePaymentView[];
 }
 
@@ -107,6 +110,8 @@ export class StudentFeesService {
           Number(fee.netAmount) - Number(fee.paidAmount)
         ).toFixed(2),
         paymentStatus: fee.paymentStatus,
+        pickupLocation: fee.pickupLocation,
+        dropLocation: fee.dropLocation,
         // Payment transactions live in the `payments` table and are fetched
         // on demand via the payment endpoints — not joined into the list.
         payments: [],
