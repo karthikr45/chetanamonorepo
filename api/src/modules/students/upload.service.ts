@@ -215,20 +215,33 @@ export class UploadService {
           };
         });
 
-        const feesCreated = await this.feesService.bulkCreate(
+        const feeResult = await this.feesService.bulkUpsertFees(
           feeInputs,
           manager,
         );
 
         this.logger.log(
-          `Upload committed: ${studentsResult.created} new students, ${studentsResult.updated} updated, ${feesCreated} fees`,
+          `Upload committed: ${studentsResult.created} new students, ` +
+            `${feeResult.created} new fees, ${feeResult.updated} fees revised`,
         );
 
+        const parts = [
+          `${studentsResult.created} student(s) added`,
+          `${feeResult.created} new fee(s)`,
+        ];
+        if (feeResult.updated) parts.push(`${feeResult.updated} fee(s) revised`);
+        if (feeResult.skipped) {
+          parts.push(
+            `${feeResult.skipped} fee(s) left unchanged (would drop below amount already paid)`,
+          );
+        }
+
         return {
-          message: 'Upload completed successfully',
+          message: `Upload completed — ${parts.join(', ')}.`,
           studentsCreated: studentsResult.created,
           studentsUpdated: studentsResult.updated,
-          feesCreated,
+          feesCreated: feeResult.created,
+          feesUpdated: feeResult.updated,
         };
       });
     } catch (err) {

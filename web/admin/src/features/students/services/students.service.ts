@@ -411,6 +411,6 @@ export async function checkTermDetails(file: File): Promise<UploadValidationRow[
   return checkTermDetailsApi(file);
 }
 
-export async function uploadStudentData(file: File): Promise<UploadValidationRow[]> {
+export async function uploadStudentData(file: File): Promise<unknown> {
   return uploadStudentDataApi(file);
 }

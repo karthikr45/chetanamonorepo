@@ -11,7 +11,11 @@ import {
   ValidatedRow,
   ValidateUploadResponseDto,
 } from './dto/upload.dto';
-import { FeePeriod } from '../fees/entities/fee.entity';
+import { FeePeriod, MonthType } from '../fees/entities/fee.entity';
+import { isPastAcademicMonth } from '../fees/fee-math';
+
+/** Month vocabulary — used to tell a revisable month from an immutable term. */
+const MONTH_SET = new Set<string>(Object.values(MonthType));
 
 export interface ValidationOutput {
   response: ValidateUploadResponseDto;
@@ -105,10 +109,21 @@ export class UploadValidationService {
           );
         }
         if (existingSet.has(key)) {
-          anyTermExists = true;
-          errors.push(
-            `${v.term} already exists for admission ${v.admissionNumber} (${v.academicYear}). Excel is insert-only — to change an existing fee, edit it from the Students table.`,
-          );
+          const isMonth = MONTH_SET.has(v.term);
+          if (isMonth && !isPastAcademicMonth(v.academicYear, v.term)) {
+            // Current / upcoming month that already has a fee — allowed: the
+            // upload will revise its amount. Not a failure.
+          } else if (isMonth) {
+            anyTermExists = true;
+            errors.push(
+              `${v.term} (${v.academicYear}) has already passed — its fee is locked and cannot be changed by re-uploading. Leave this month's column blank to keep it as is.`,
+            );
+          } else {
+            anyTermExists = true;
+            errors.push(
+              `${v.term} already exists for admission ${v.admissionNumber} (${v.academicYear}). Term fees cannot be changed via Excel — edit it from the Students table.`,
+            );
+          }
         }
       }
 

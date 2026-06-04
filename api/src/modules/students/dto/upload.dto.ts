@@ -23,4 +23,6 @@ export class ConfirmUploadResponseDto {
   studentsCreated: number;
   studentsUpdated: number;
   feesCreated: number;
+  /** Existing current/upcoming-month fees revised by the upload. */
+  feesUpdated?: number;
 }

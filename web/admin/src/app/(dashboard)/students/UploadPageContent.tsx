@@ -216,7 +216,15 @@ export function UploadPageContent({ onBack }: UploadPageContentProps) {
       if (hasSubmitErrors) {
         setSubmitError("Some rows failed. Hover red rows to see the message.");
       } else {
-        setSubmitSuccess("Student data uploaded successfully.");
+        // The confirm endpoint returns a summary ({ message, counts… }) —
+        // surface it so admins see how many fees were created vs revised.
+        const summaryMessage =
+          submitResult &&
+          typeof submitResult === "object" &&
+          typeof (submitResult as { message?: unknown }).message === "string"
+            ? (submitResult as { message: string }).message
+            : "Student data uploaded successfully.";
+        setSubmitSuccess(summaryMessage);
         onBack?.();
       }
     } catch (err: unknown) {

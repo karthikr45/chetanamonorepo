@@ -285,6 +285,94 @@ export class FeesService {
   }
 
   /**
+   * Upload upsert: create new fees and revise existing ones. Used by the
+   * Excel confirm path. Existing fees are only ever current/upcoming months
+   * here (the validator rejects past months and existing terms before we get
+   * here), so updating their amount/discount is safe — we still never reduce
+   * a fee below what's already been paid (such a row is left unchanged).
+   */
+  async bulkUpsertFees(
+    inputs: CreateFeeInput[],
+    manager: EntityManager,
+  ): Promise<{ created: number; updated: number; skipped: number }> {
+    if (!inputs.length) return { created: 0, updated: 0, skipped: 0 };
+
+    const repo = manager.getRepository(Fee);
+    const tenantId = inputs[0].tenantId;
+    const studentIds = [...new Set(inputs.map((i) => i.studentId))];
+    const years = [...new Set(inputs.map((i) => i.academicYear))];
+
+    const existing = await repo.find({
+      where: { tenantId, studentId: In(studentIds), academicYear: In(years) },
+    });
+    const byKey = new Map<string, Fee>();
+    for (const f of existing) {
+      byKey.set(`${f.studentId}::${f.academicYear}::${f.term}`, f);
+    }
+
+    const toSave: Fee[] = [];
+    let created = 0;
+    let updated = 0;
+    let skipped = 0;
+
+    for (const input of inputs) {
+      const discount = Math.max(0, input.totalDiscount ?? 0);
+      const found = byKey.get(
+        `${input.studentId}::${input.academicYear}::${input.term}`,
+      );
+
+      if (found) {
+        const newDiscount = Math.min(discount, input.originalAmount);
+        const prospectiveNet =
+          input.originalAmount + Number(found.totalPenalty) - newDiscount;
+        // Never let a re-upload drop a fee below what's already been paid.
+        if (prospectiveNet < Number(found.paidAmount) - 0.01) {
+          skipped++;
+          continue;
+        }
+        found.originalAmount = input.originalAmount.toFixed(2);
+        found.totalDiscount = newDiscount.toFixed(2);
+        if (input.pickupLocation !== undefined) {
+          found.pickupLocation = input.pickupLocation ?? null;
+        }
+        if (input.dropLocation !== undefined) {
+          found.dropLocation = input.dropLocation ?? null;
+        }
+        this.recomputeDerived(found);
+        toSave.push(found);
+        updated++;
+      } else {
+        const net = Math.max(0, input.originalAmount - discount);
+        toSave.push(
+          repo.create({
+            tenantId: input.tenantId,
+            academicYear: input.academicYear,
+            studentId: input.studentId,
+            term: input.term,
+            originalAmount: input.originalAmount.toFixed(2),
+            totalPenalty: '0.00',
+            totalDiscount: discount.toFixed(2),
+            netAmount: net.toFixed(2),
+            paidAmount: '0.00',
+            paymentStatus: PaymentStatus.UNPAID,
+            pickupLocation: input.pickupLocation ?? null,
+            dropLocation: input.dropLocation ?? null,
+          }),
+        );
+        created++;
+      }
+    }
+
+    for (let i = 0; i < toSave.length; i += BATCH_SIZE) {
+      await repo.save(toSave.slice(i, i + BATCH_SIZE));
+    }
+    this.logger.log(
+      `Upserted fees: ${created} created, ${updated} updated, ${skipped} skipped`,
+    );
+    return { created, updated, skipped };
+  }
+
+  /**
    * Create-or-update per-period fees for one student from the Edit Student
    * screen. Monthly (transport) tenants use this to add a month that wasn't
    * billed yet, or change the boarding / drop point month-wise.

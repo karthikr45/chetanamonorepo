@@ -119,10 +119,13 @@ export async function checkTermDetailsApi(file: File): Promise<UploadValidationR
   return post<UploadValidationRow[]>(url, formData);
 }
 
-export async function uploadStudentDataApi(file: File): Promise<UploadValidationRow[]> {
+// The confirm endpoint returns a summary object ({ message, counts… }) on
+// success, or a rows payload when there are row-level failures — so the
+// caller treats the result as unknown and narrows it.
+export async function uploadStudentDataApi(file: File): Promise<unknown> {
   const url = `${API_ENDPOINTS.studentsDetails.uploadStudentData}`;
   const formData = buildStudentUploadFormData(file);
-  return post<UploadValidationRow[]>(url, formData);
+  return post<unknown>(url, formData);
 }
 
 export async function getLatestStudentsApi(): Promise<LatestStudent[]> {
