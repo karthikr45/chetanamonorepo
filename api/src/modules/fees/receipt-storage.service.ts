@@ -107,15 +107,18 @@ export class ReceiptStorageService {
     const tenant = await this.tenantRepo.findOne({ where: { id: tenantId } });
     if (!tenant) throw new NotFoundException('Tenant not found.');
 
-    // Logo comes from the tenant's active configuration: prefer the
-    // dedicated receipt logo, fall back to the general logo, then default.
-    const cfg = await this.tenantConfigRepo.findOne({
+    // Logo comes from the tenant's active configuration: prefer a configured
+    // receipt logo, then the general logo, then the default. A tenant can
+    // have several active configs (one per environment), so scan all of
+    // them for the first that actually has a logo rather than assuming the
+    // most-recent one carries it.
+    const configs = await this.tenantConfigRepo.find({
       where: { tenantId, isActive: true },
       order: { createdAt: 'DESC' },
     });
     const logoUrl =
-      cfg?.receiptLogoUrl?.trim() ||
-      cfg?.logoUrl?.trim() ||
+      configs.find((c) => c.receiptLogoUrl?.trim())?.receiptLogoUrl?.trim() ||
+      configs.find((c) => c.logoUrl?.trim())?.logoUrl?.trim() ||
       DEFAULT_RECEIPT_LOGO;
 
     const html = this.buildReceiptHtml(fp, fee, student, logoUrl);

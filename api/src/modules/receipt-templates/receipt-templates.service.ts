@@ -361,11 +361,15 @@ export class ReceiptTemplatesService {
    * so templates can decide whether to render an <img>.
    */
   private async resolveReceiptLogo(tenantId: string): Promise<string> {
-    const cfg = await this.dataSource.getRepository(TenantConfig).findOne({
+    const configs = await this.dataSource.getRepository(TenantConfig).find({
       where: { tenantId, isActive: true },
       order: { createdAt: 'DESC' },
     });
-    return cfg?.receiptLogoUrl?.trim() || cfg?.logoUrl?.trim() || '';
+    return (
+      configs.find((c) => c.receiptLogoUrl?.trim())?.receiptLogoUrl?.trim() ||
+      configs.find((c) => c.logoUrl?.trim())?.logoUrl?.trim() ||
+      ''
+    );
   }
 
   private sampleContext(tenant: Tenant | null, logoUrl = ''): TemplateContext {
