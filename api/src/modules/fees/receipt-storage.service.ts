@@ -9,10 +9,6 @@ import { Student } from '../students/entities/student.entity';
 import { ReceiptPdfService } from './receipt-pdf.service';
 import { AzureStorageService } from '../storage/azure-storage.service';
 
-/** Fallback receipt logo when the tenant config has none configured. */
-const DEFAULT_RECEIPT_LOGO =
-  'https://aautifileuploads.blob.core.windows.net/svbk/svbk_receipt_logo.png';
-
 /** Offline payment types — everything else is treated as an online/gateway payment. */
 const OFFLINE_TYPES = new Set(['CASH', 'CHEQUE', 'DD', 'POS', 'NEFT']);
 
@@ -109,26 +105,21 @@ export class ReceiptStorageService {
     const tenant = await this.tenantRepo.findOne({ where: { id: tenantId } });
     if (!tenant) throw new NotFoundException('Tenant not found.');
 
-    // Logo comes from the tenant's active configuration: prefer a configured
-    // receipt logo, then the general logo, then the default. A tenant can
-    // have several active configs (one per environment), so scan all of
-    // them for the first that actually has a logo rather than assuming the
-    // most-recent one carries it.
+    // Receipt logo: ONLY the tenant's configured receipt logo. No fallback
+    // to the general logo or a default — if no active config has a
+    // receiptLogoUrl, the receipt renders without a logo. A tenant can have
+    // several active configs (one per environment), so scan them.
     const configs = await this.tenantConfigRepo.find({
       where: { tenantId, isActive: true },
       order: { createdAt: 'DESC' },
     });
     const logoUrl =
-      configs.find((c) => c.receiptLogoUrl?.trim())?.receiptLogoUrl?.trim() ||
-      configs.find((c) => c.logoUrl?.trim())?.logoUrl?.trim() ||
-      DEFAULT_RECEIPT_LOGO;
+      configs.find((c) => c.receiptLogoUrl?.trim())?.receiptLogoUrl?.trim() ?? '';
 
-    // Diagnostic: shows which logo the receipt actually used and why.
     this.logger.log(
       `Receipt logo for tenant=${tenantId}: activeConfigs=${configs.length} ` +
         `receiptLogoUrls=${JSON.stringify(configs.map((c) => c.receiptLogoUrl ?? null))} ` +
-        `logoUrls=${JSON.stringify(configs.map((c) => c.logoUrl ?? null))} ` +
-        `→ resolved=${logoUrl}${logoUrl === DEFAULT_RECEIPT_LOGO ? ' (DEFAULT fallback)' : ''}`,
+        `→ ${logoUrl ? `resolved=${logoUrl}` : 'no receipt logo configured (rendering without logo)'}`,
     );
 
     const html = this.buildReceiptHtml(fp, fee, student, logoUrl);
@@ -240,7 +231,7 @@ export class ReceiptStorageService {
 
         <body>
             <div id="main">
-                <img src="${esc(logoUrl)}" alt="School logo" style="width:600px;height:110px" class="center">
+                ${logoUrl ? `<img src="${esc(logoUrl)}" alt="School logo" style="width:600px;height:110px" class="center">` : ''}
             </div>
             <p style="text-align:center; font-size: 24px">Fee Receipt</p>
             <div>

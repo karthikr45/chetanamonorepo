@@ -365,10 +365,9 @@ export class ReceiptTemplatesService {
       where: { tenantId, isActive: true },
       order: { createdAt: 'DESC' },
     });
+    // Only the configured receipt logo — no fallback to the general logo.
     return (
-      configs.find((c) => c.receiptLogoUrl?.trim())?.receiptLogoUrl?.trim() ||
-      configs.find((c) => c.logoUrl?.trim())?.logoUrl?.trim() ||
-      ''
+      configs.find((c) => c.receiptLogoUrl?.trim())?.receiptLogoUrl?.trim() || ''
     );
   }
 
