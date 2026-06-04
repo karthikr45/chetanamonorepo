@@ -31,7 +31,7 @@ import { Tenant } from '../tenants/entities/tenant.entity';
  * this service never creates them, it only reads/writes blobs into them.
  *
  * Blob layout inside the container:
- *  - chat attachments → `chat-files/{file}`
+ *  - chat attachments → `{tenantCode}/chats/{file}`
  *  - media uploads     → `{tenantCode}/media/{file}`
  *  - social feed images→ `{tenantCode}/social-feed/{file}`
  *  - receipts          → `{tenantCode}/receipts/{file}`
@@ -216,15 +216,20 @@ export class AzureStorageService {
       return this.uploadLocal(args);
     }
 
+    // Organise chat blobs per tenant inside the configured container — same
+    // `{tenantCode}/{folder}/{file}` layout used by media and receipts — so
+    // files are easy to find when several tenants share one container.
+    const tenantCode = await this.resolveTenantCode(args.tenantId);
     this.logger.log(
-      `uploadFile: tenant ${args.tenantId} → Azure container "${cfg.storageContainerName}".`,
+      `uploadFile: tenant ${args.tenantId} → Azure container "${cfg.storageContainerName}" ` +
+        `under "${tenantCode}/${args.folder ?? 'chats'}".`,
     );
     const { blobService, container, baseHost } = this.clientFromConfig(cfg);
     const containerClient = blobService.getContainerClient(container);
 
     const ext = extOf(args.originalName, args.mimeType);
-    const folder = sanitizePathSegment(args.folder ?? 'chat-files');
-    const key = `${folder}/${Date.now()}-${randomBytes(8).toString('hex')}${ext}`;
+    const folder = sanitizePathSegment(args.folder ?? 'chats');
+    const key = `${tenantCode}/${folder}/${Date.now()}-${randomBytes(8).toString('hex')}${ext}`;
 
     try {
       await containerClient.getBlockBlobClient(key).uploadData(args.buffer, {
@@ -267,7 +272,7 @@ export class AzureStorageService {
   }): Promise<{ url: string; key: string }> {
     const baseDir =
       process.env.LOCAL_UPLOAD_DIR || join(process.cwd(), 'uploads');
-    const folder = sanitizePathSegment(args.folder ?? 'chat-files');
+    const folder = sanitizePathSegment(args.folder ?? 'chats');
     const ext = extOf(args.originalName, args.mimeType);
     const key = `${folder}/${Date.now()}-${randomBytes(8).toString('hex')}${ext}`;
     const fullPath = join(baseDir, key);

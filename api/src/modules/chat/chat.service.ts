@@ -467,7 +467,7 @@ export class ChatService {
         buffer: file.buffer,
         mimeType: file.mimetype,
         originalName: file.originalname,
-        folder: 'chat-files',
+        folder: 'chats',
       }));
     } catch (err) {
       this.logger.error(
