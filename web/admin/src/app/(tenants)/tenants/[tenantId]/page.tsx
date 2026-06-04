@@ -262,7 +262,6 @@ function TenantDetailsPageContent() {
     lastName: string;
     email: string;
     role: string;
-    branch: string;
     password: string;
   };
   const emptyAdmin: NewAdmin = {
@@ -270,7 +269,6 @@ function TenantDetailsPageContent() {
     lastName: "",
     email: "",
     role: "",
-    branch: "",
     password: "",
   };
   const [adminModalOpen, setAdminModalOpen] = useState(false);
@@ -318,7 +316,6 @@ function TenantDetailsPageContent() {
       "lastName",
       "email",
       "role",
-      "branch",
     ];
     required.forEach((key) => {
       if (!newAdmin[key].trim()) errs[key] = "This field is required";
@@ -340,7 +337,6 @@ function TenantDetailsPageContent() {
         lastName: newAdmin.lastName,
         email: newAdmin.email,
         role: newAdmin.role,
-        branch: newAdmin.branch,
         ...(newAdmin.password ? { password: newAdmin.password } : {}),
       });
       setAdminSuccess("Admin added successfully!");
@@ -1030,14 +1026,6 @@ function TenantDetailsPageContent() {
               error={adminErrors.role}
               placeholder="Select role"
               required
-            />
-            <Input
-              label="Branch *"
-              placeholder="e.g. Main Campus"
-              value={newAdmin.branch}
-              onChange={(e) => updateAdmin({ branch: e.target.value })}
-              error={adminErrors.branch}
-              fullWidth
             />
             <Input
               label="Initial password (optional)"

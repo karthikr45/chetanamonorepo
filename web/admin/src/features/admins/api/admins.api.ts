@@ -13,7 +13,6 @@ export type SaveAdminPayload = {
   email: string;
   // mobile: string;
   role: string;
-  branch: string;
   /** Optional. Backend falls back to its default seed password if omitted. */
   password?: string;
 };
@@ -26,7 +25,6 @@ export type Admin = {
   email: string;
   // mobile: string;
   role: string;
-  branch: string;
 };
 
 export async function getAdminsApi(tenantId: string): Promise<Admin[]> {

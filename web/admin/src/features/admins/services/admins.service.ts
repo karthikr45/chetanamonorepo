@@ -30,6 +30,5 @@ export async function saveAdmin(payload: SaveAdminPayload): Promise<Admin> {
     lastName: raw?.lastName ?? payload.lastName,
     email: raw?.email ?? payload.email,
     role: raw?.role ?? payload.role,
-    branch: raw?.branch ?? payload.branch,
   };
 }

@@ -89,13 +89,13 @@ export default function PublicPayPage() {
   const [receiptLoadingId, setReceiptLoadingId] = useState<string | null>(null);
 
   // Ask the API to generate + store the PDF, then open the returned URL.
-  async function openReceipt(feePaymentId: string) {
-    setReceiptLoadingId(feePaymentId);
+  async function openReceipt(paymentId: string) {
+    setReceiptLoadingId(paymentId);
     setPayError(null);
     try {
       const url = await fetchPublicReceiptUrl(
         window.location.host,
-        feePaymentId,
+        paymentId,
       );
       window.open(url, "_blank", "noopener,noreferrer");
     } catch (err) {
@@ -263,7 +263,7 @@ export default function PublicPayPage() {
         try {
           const result = await verifyPublicPayment({ host, ...args });
           setSuccessMsg("Payment successful.");
-          setLastReceiptId(result.feePaymentId ?? null);
+          setLastReceiptId(result.paymentId ?? null);
           setPendingFeeId(null);
           clearPendingPay();
           // Re-pull the fee list so the just-paid row flips to PAID
@@ -565,13 +565,13 @@ export default function PublicPayPage() {
                           : `Pay ${inr(balance)}`}
                     </button>
                   )}
-                  {paid && f.feePaymentId && (
+                  {paid && f.paymentId && (
                     <button
-                      onClick={() => openReceipt(f.feePaymentId!)}
-                      disabled={receiptLoadingId === f.feePaymentId}
+                      onClick={() => openReceipt(f.paymentId!)}
+                      disabled={receiptLoadingId === f.paymentId}
                       className="mt-4 block w-full rounded-lg border border-green-600 text-green-700 text-center text-sm font-semibold py-2.5 hover:bg-green-50 disabled:opacity-60"
                     >
-                      {receiptLoadingId === f.feePaymentId
+                      {receiptLoadingId === f.paymentId
                         ? "Preparing…"
                         : "Download receipt"}
                     </button>

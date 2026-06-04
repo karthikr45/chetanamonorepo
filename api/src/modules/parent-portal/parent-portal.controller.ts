@@ -65,18 +65,18 @@ export class ParentPortalController {
     return this.portal.childServices(user.tenantId, user.userId, studentId);
   }
 
-  @Get('payments/receipt/:feePaymentId')
+  @Get('payments/receipt/:paymentId')
   @ApiOperation({
     summary: 'Generate the PDF receipt and return its URL (own children only)',
   })
   receipt(
     @CurrentUser() user: any,
-    @Param('feePaymentId') feePaymentId: string,
+    @Param('paymentId') paymentId: string,
   ) {
     return this.portal.getReceiptUrlForParent(
       user.tenantId,
       user.userId,
-      feePaymentId,
+      paymentId,
     );
   }
 

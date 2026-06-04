@@ -20,9 +20,9 @@ function inr(v: number | string) {
   }).format(Number.isFinite(n) ? n : 0);
 }
 
-async function openReceipt(feePaymentId: string) {
+async function openReceipt(paymentId: string) {
   try {
-    const url = await fetchParentReceiptUrl(feePaymentId);
+    const url = await fetchParentReceiptUrl(paymentId);
     window.open(url, "_blank", "noopener,noreferrer");
   } catch (e) {
     alert(apiErrorMessage(e, "Could not open the receipt"));
@@ -196,7 +196,7 @@ export default function FeeDetailsPage() {
                           <ul className="space-y-1.5">
                             {y.payments.map((p) => (
                               <li
-                                key={p.feePaymentId}
+                                key={p.paymentId}
                                 className="flex items-center justify-between gap-3 rounded-lg bg-slate-50 px-3 py-2 text-[13px]"
                               >
                                 <span className="min-w-0">
@@ -224,7 +224,7 @@ export default function FeeDetailsPage() {
                                   </span>
                                 </span>
                                 <button
-                                  onClick={() => openReceipt(p.feePaymentId)}
+                                  onClick={() => openReceipt(p.paymentId)}
                                   className="flex-shrink-0 text-xs font-semibold text-[#6c739c] hover:underline"
                                 >
                                   Receipt

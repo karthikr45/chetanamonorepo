@@ -30,7 +30,6 @@ export interface TenantUserRow {
   lastName: string;
   email: string;
   role: string;
-  branch?: string | null;
   tenantId?: string | null;
   isActive: boolean;
   createdAt: string;
@@ -42,7 +41,6 @@ export interface CreateTenantUserBody {
   lastName: string;
   email: string;
   role: string;
-  branch?: string;
   password?: string;
 }
 
@@ -50,7 +48,6 @@ export interface UpdateTenantUserBody {
   firstName?: string;
   lastName?: string;
   role?: string;
-  branch?: string;
   password?: string;
   isActive?: boolean;
 }

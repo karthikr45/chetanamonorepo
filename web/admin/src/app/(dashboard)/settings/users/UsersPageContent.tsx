@@ -137,7 +137,6 @@ export function UsersPageContent() {
                 <Th>Name</Th>
                 <Th>Email</Th>
                 <Th>Role</Th>
-                <Th>Branch</Th>
                 <Th>Status</Th>
                 <Th align="right">{""}</Th>
               </tr>
@@ -159,7 +158,6 @@ export function UsersPageContent() {
                       {ROLE_LABEL[r.role] ?? r.role}
                     </span>
                   </td>
-                  <td className="px-5 py-3.5 text-slate-500">{r.branch || "—"}</td>
                   <td className="px-5 py-3.5">
                     <span
                       className={`inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-bold ${
@@ -257,7 +255,6 @@ function UserEditDialog({
   const [role, setRole] = useState<string>(
     existing?.role ?? roleOptions[0]?.value ?? "fin_admin",
   );
-  const [branch, setBranch] = useState(existing?.branch ?? "");
   const [password, setPassword] = useState("");
   const [isActive, setIsActive] = useState(existing?.isActive ?? true);
   const [submitting, setSubmitting] = useState(false);
@@ -282,7 +279,6 @@ function UserEditDialog({
           firstName,
           lastName,
           role,
-          branch: branch || undefined,
           isActive,
         };
         if (password.trim()) body.password = password.trim();
@@ -293,7 +289,6 @@ function UserEditDialog({
           lastName,
           email: email.trim(),
           role,
-          branch: branch || undefined,
         };
         if (password.trim()) body.password = password.trim();
         await createTenantUserApi(body);
@@ -382,27 +377,17 @@ function UserEditDialog({
             </p>
           </Field>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <Field label="Branch (optional)">
-              <input
-                value={branch}
-                onChange={(e) => setBranch(e.target.value)}
-                className="form-input-x"
-                placeholder="Main"
-              />
-            </Field>
-            <Field
-              label={isEdit ? "New password (optional)" : "Initial password (optional)"}
-            >
-              <input
-                type="text"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className="form-input-x"
-                placeholder="Leave blank for system default"
-              />
-            </Field>
-          </div>
+          <Field
+            label={isEdit ? "New password (optional)" : "Initial password (optional)"}
+          >
+            <input
+              type="text"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              className="form-input-x"
+              placeholder="Leave blank for system default"
+            />
+          </Field>
 
           {isEdit && (
             <label className="inline-flex items-center gap-2 text-sm text-slate-700">

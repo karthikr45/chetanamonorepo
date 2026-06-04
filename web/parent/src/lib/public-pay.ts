@@ -51,7 +51,7 @@ export interface PublicFee {
   paymentStatus: string;
   balance: string;
   /** Latest receipt id for this fee, if any payment has been recorded. */
-  feePaymentId: string | null;
+  paymentId: string | null;
 }
 
 export interface PublicFeesResponse {
@@ -105,9 +105,9 @@ export async function verifyPublicPayment(args: {
   gatewayOrderId: string;
   gatewayPaymentId?: string;
   signature?: string;
-}): Promise<{ payment: { id: string }; feePaymentId: string | null }> {
+}): Promise<{ payment: { id: string }; paymentId: string | null }> {
   const { data } = await publicApi.post("/public-pay/verify", args);
-  return unwrap<{ payment: { id: string }; feePaymentId: string | null }>(data);
+  return unwrap<{ payment: { id: string }; paymentId: string | null }>(data);
 }
 
 /**
@@ -116,10 +116,10 @@ export async function verifyPublicPayment(args: {
  */
 export async function fetchPublicReceiptUrl(
   host: string,
-  feePaymentId: string,
+  paymentId: string,
 ): Promise<string> {
   const { data } = await publicApi.get(
-    `/public-pay/receipt/${encodeURIComponent(feePaymentId)}`,
+    `/public-pay/receipt/${encodeURIComponent(paymentId)}`,
     { params: { host } },
   );
   return unwrap<{ url: string }>(data).url;

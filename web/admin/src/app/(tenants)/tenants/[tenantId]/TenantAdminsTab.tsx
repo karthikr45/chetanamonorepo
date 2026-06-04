@@ -92,9 +92,6 @@ export default function TenantAdminsTab({ tenantId }: { tenantId: string }) {
                 <th className="px-5 py-3 text-left text-[11px] font-bold uppercase tracking-[0.06em] text-[var(--app-text-muted)]">
                   Role
                 </th>
-                <th className="px-5 py-3 text-left text-[11px] font-bold uppercase tracking-[0.06em] text-[var(--app-text-muted)]">
-                  Branch
-                </th>
               </tr>
             </thead>
             <tbody>
@@ -124,9 +121,6 @@ export default function TenantAdminsTab({ tenantId }: { tenantId: string }) {
                       {admin.role}
                     </span>
                   </td>
-                  <td className="px-5 py-3.5 text-[var(--app-text-secondary)]">
-                    {admin.branch}
-                  </td>
                 </tr>
               ))}
             </tbody>
@@ -145,9 +139,6 @@ export default function TenantAdminsTab({ tenantId }: { tenantId: string }) {
                   </p>
                   <p className="text-xs text-[var(--app-text-secondary)]">{admin.email}</p>
                 </div>
-              </div>
-              <div className="flex flex-wrap gap-x-4 gap-y-1 pl-12 text-xs text-[var(--app-text-secondary)]">
-                <span>{admin.branch}</span>
               </div>
               <div className="pl-12">
                 <span

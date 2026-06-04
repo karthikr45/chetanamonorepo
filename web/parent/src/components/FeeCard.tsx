@@ -30,9 +30,9 @@ function readPendingPay(): string | null {
 }
 
 // Ask the API to generate + store the PDF in Azure, then open its URL.
-async function openReceipt(feePaymentId: string) {
+async function openReceipt(paymentId: string) {
   try {
-    const url = await fetchParentReceiptUrl(feePaymentId);
+    const url = await fetchParentReceiptUrl(paymentId);
     window.open(url, "_blank", "noopener,noreferrer");
   } catch (e) {
     alert(apiErrorMessage(e, "Could not open the receipt"));
@@ -359,10 +359,10 @@ export function FeeCard({
         </div>
       )}
 
-      {fee.feePaymentId && (
+      {fee.paymentId && (
         <div className="mt-3">
           <button
-            onClick={() => openReceipt(fee.feePaymentId!)}
+            onClick={() => openReceipt(fee.paymentId!)}
             className="w-full h-10 rounded-lg border border-[#6c739c] text-[#6c739c] text-sm font-semibold inline-flex items-center justify-center gap-2 hover:bg-[#6c739c]/5"
           >
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">

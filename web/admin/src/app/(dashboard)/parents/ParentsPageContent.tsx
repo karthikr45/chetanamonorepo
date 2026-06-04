@@ -18,7 +18,7 @@ const EMPTY_FORM: CreateParentInput = {
   phoneNumber: "",
   isActive: true,
   students: [
-    { branch: "", admissionNumber: "", relationship: "guardian", isPrimary: true },
+    { admissionNumber: "", relationship: "guardian", isPrimary: true },
   ],
 };
 
@@ -59,7 +59,7 @@ export function ParentsPageContent() {
       ...f,
       students: [
         ...f.students,
-        { branch: "", admissionNumber: "", relationship: "guardian", isPrimary: false },
+        { admissionNumber: "", relationship: "guardian", isPrimary: false },
       ],
     }));
   }
@@ -78,8 +78,8 @@ export function ParentsPageContent() {
       setFormError("Name and email are required.");
       return;
     }
-    if (form.students.some((s) => !s.branch.trim() || !s.admissionNumber.trim())) {
-      setFormError("Every student row needs a branch and admission number.");
+    if (form.students.some((s) => !s.admissionNumber.trim())) {
+      setFormError("Every student row needs an admission number.");
       return;
     }
     setSubmitting(true);
@@ -213,18 +213,12 @@ export function ParentsPageContent() {
                     className="grid grid-cols-1 sm:grid-cols-12 gap-2 items-center p-3 rounded-lg bg-slate-50 border border-slate-100"
                   >
                     <input
-                      placeholder="Branch"
-                      value={s.branch}
-                      onChange={(e) => updateStudent(i, { branch: e.target.value })}
-                      className="form-input form-input-tight sm:col-span-3"
-                    />
-                    <input
                       placeholder="Admission no."
                       value={s.admissionNumber}
                       onChange={(e) =>
                         updateStudent(i, { admissionNumber: e.target.value })
                       }
-                      className="form-input form-input-tight sm:col-span-3"
+                      className="form-input form-input-tight sm:col-span-6"
                     />
                     <select
                       value={s.relationship}
@@ -370,10 +364,6 @@ export function ParentsPageContent() {
                             className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-semibold bg-slate-100 text-slate-700 tabular-nums"
                           >
                             {l.admissionNumber}
-                            <span className="text-slate-400">·</span>
-                            <span className="font-normal text-slate-500">
-                              {l.branch}
-                            </span>
                           </span>
                         ))}
                       </div>

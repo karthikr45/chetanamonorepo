@@ -80,10 +80,10 @@ export class ReceiptStorageService {
    */
   async generateAndStore(
     tenantId: string,
-    feePaymentId: string,
+    paymentId: string,
   ): Promise<{ url: string }> {
     const fp = await this.feePaymentRepo.findOne({
-      where: { id: feePaymentId, tenantId },
+      where: { id: paymentId, tenantId },
     });
     if (!fp || !fp.feeId) throw new NotFoundException('Receipt not found.');
 

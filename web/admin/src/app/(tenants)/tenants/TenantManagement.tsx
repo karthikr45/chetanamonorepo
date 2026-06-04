@@ -509,8 +509,8 @@ function TenantManagement() {
               </div>
 
               <Input
-                label="Branch Name"
-                placeholder="e.g. Main Campus"
+                label="Tenant Name"
+                placeholder="e.g. Ushodaya High School"
                 value={formData.tenantName}
                 onChange={(e) => setFormData({ ...formData, tenantName: e.target.value })}
                 error={formErrors.tenantName}

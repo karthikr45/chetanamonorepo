@@ -58,13 +58,13 @@ export class PublicPayController {
    * inside the service, so a stray id from a different school resolves to
    * 404.
    */
-  @Get('receipt/:feePaymentId')
+  @Get('receipt/:paymentId')
   @Throttle({ default: { ttl: 60_000, limit: 20 } })
   @ApiOperation({ summary: 'Generate the PDF receipt and return its URL' })
   receipt(
     @Query('host') host: string,
-    @Param('feePaymentId') feePaymentId: string,
+    @Param('paymentId') paymentId: string,
   ) {
-    return this.service.getReceiptUrl(host, feePaymentId);
+    return this.service.getReceiptUrl(host, paymentId);
   }
 }

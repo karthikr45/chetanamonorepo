@@ -1047,7 +1047,7 @@ async waivePenaltyForStudents(
    */
   async updateClearance(
     tenantId: string,
-    feePaymentId: string,
+    paymentId: string,
     status: ClearanceStatus,
     notes?: string,
   ): Promise<FeePayment> {
@@ -1058,9 +1058,9 @@ async waivePenaltyForStudents(
     }
     return this.dataSource.transaction(async (manager) => {
       const fp = await manager.getRepository(FeePayment).findOne({
-        where: { id: feePaymentId, tenantId },
+        where: { id: paymentId, tenantId },
       });
-      if (!fp) throw new NotFoundException(`fee_payment ${feePaymentId} not found`);
+      if (!fp) throw new NotFoundException(`payment ${paymentId} not found`);
       if (
         fp.method !== PaymentType.CHEQUE &&
         fp.method !== PaymentType.DD
@@ -1106,7 +1106,7 @@ async waivePenaltyForStudents(
       const saved = await manager.getRepository(FeePayment).save(fp);
 
       this.logger.log(
-        `Clearance ${status} for fee_payment=${feePaymentId}; fee.paid_amount=${fee.paidAmount}`,
+        `Clearance ${status} for fee_payment=${paymentId}; fee.paid_amount=${fee.paidAmount}`,
       );
       return saved;
     });
@@ -1480,7 +1480,7 @@ ${body}
       .innerJoinAndMapOne('fp.fee', Fee, 'fee', 'fee.id = fp.feeId')
       .where('fp.tenantId = :tenantId AND fp.id = :paymentId', { tenantId, paymentId })
       .getOne();
-    if (!fp) throw new NotFoundException(`fee_payment ${paymentId} not found`);
+    if (!fp) throw new NotFoundException(`payment ${paymentId} not found`);
 
     const tplKind = ReceiptTemplatesService.kindForPayment(fp);
     let tpl = await this.receiptTemplates.pickDefault(tenantId, tplKind);

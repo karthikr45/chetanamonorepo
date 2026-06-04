@@ -37,7 +37,7 @@ export function PenaltyRulesContent() {
     <div>
       <PageHeader
         title="Penalty Rules"
-        subtitle="Configure tenant-wide late-fee rules. Rules can target a specific term/branch/year or apply to everything. You can also apply or waive penalties manually for one or many students."
+        subtitle="Configure tenant-wide late-fee rules. Rules can target a specific term/year or apply to everything. You can also apply or waive penalties manually for one or many students."
       />
 
       <div
@@ -158,14 +158,6 @@ function RulesPanel() {
         <Card padding="default">
           <h3 className="text-sm font-bold mb-4">New penalty rule</h3>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <Field label="Branch (optional)" hint="Leave blank to apply to all branches">
-              <input
-                value={form.branch ?? ""}
-                onChange={(e) => setForm({ ...form, branch: e.target.value || undefined })}
-                placeholder="e.g. Main"
-                className="form-input"
-              />
-            </Field>
             <Field label="Academic year (optional)" hint="Leave blank to apply to all years">
               <AcademicYearSelect
                 value={form.academicYear ?? ""}
@@ -281,7 +273,6 @@ function RulesPanel() {
               {rows.map((r, i) => (
                 <tr key={r.id} className={`hover:bg-slate-50 ${i !== rows.length - 1 ? "border-b border-slate-50" : ""}`}>
                   <td className="px-5 py-3.5 text-[var(--app-text-secondary)]">
-                    <div>{r.branch ?? "All branches"}</div>
                     <div className="text-xs">{r.academicYear ?? "All years"} · {r.term ?? "All terms"}</div>
                   </td>
                   <td className="px-5 py-3.5 text-[var(--app-text-secondary)] tabular-nums">

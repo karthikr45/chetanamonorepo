@@ -211,7 +211,7 @@ export class ParentPortalService {
     tenantId: string,
     parentId: string,
     studentId?: string,
-  ): Promise<(Fee & { feePaymentId: string | null })[]> {
+  ): Promise<(Fee & { paymentId: string | null })[]> {
     let fees: Fee[];
     if (studentId) {
       await this.ensureChildBelongsToParent(tenantId, parentId, studentId);
@@ -238,7 +238,7 @@ export class ParentPortalService {
   private async attachLatestReceipt(
     tenantId: string,
     fees: Fee[],
-  ): Promise<(Fee & { feePaymentId: string | null })[]> {
+  ): Promise<(Fee & { paymentId: string | null })[]> {
     if (!fees.length) return [];
     const payments = await this.feePaymentRepo.find({
       where: {
@@ -255,7 +255,7 @@ export class ParentPortalService {
     }
     return fees.map((f) => ({
       ...f,
-      feePaymentId: latestByFee.get(f.id) ?? null,
+      paymentId: latestByFee.get(f.id) ?? null,
     }));
   }
 
@@ -637,7 +637,7 @@ export class ParentPortalService {
       const yr = p.feeId ? yearOfFee.get(p.feeId) : undefined;
       if (!yr || !byYear.has(yr)) continue;
       byYear.get(yr)!.payments.push({
-        feePaymentId: p.id,
+        paymentId: p.id,
         amount: p.amount,
         paymentType: p.method,
         paidAt: p.paidAt,
@@ -748,10 +748,10 @@ export class ParentPortalService {
   private async authorizeReceiptForParent(
     tenantId: string,
     parentId: string,
-    feePaymentId: string,
+    paymentId: string,
   ): Promise<FeePayment> {
     const fp = await this.feePaymentRepo.findOne({
-      where: { id: feePaymentId },
+      where: { id: paymentId },
     });
     if (!fp || !fp.feeId) throw new NotFoundException('Receipt not found');
     const fee = await this.feeRepo.findOne({
@@ -782,14 +782,14 @@ export class ParentPortalService {
   async renderReceiptForParent(
     tenantId: string,
     parentId: string,
-    feePaymentId: string,
+    paymentId: string,
   ): Promise<string> {
     const fp = await this.authorizeReceiptForParent(
       tenantId,
       parentId,
-      feePaymentId,
+      paymentId,
     );
-    return this.feesService.renderReceipt(fp.tenantId, feePaymentId);
+    return this.feesService.renderReceipt(fp.tenantId, paymentId);
   }
 
   /**
@@ -800,15 +800,15 @@ export class ParentPortalService {
   async getReceiptUrlForParent(
     tenantId: string,
     parentId: string,
-    feePaymentId: string,
+    paymentId: string,
   ): Promise<{ url: string }> {
     const fp = await this.authorizeReceiptForParent(
       tenantId,
       parentId,
-      feePaymentId,
+      paymentId,
     );
     // Use the receiving tenant (fp.tenantId) for both the receipt content
     // and its storage location — may be a sibling hostel/transport tenant.
-    return this.receiptStorage.generateAndStore(fp.tenantId, feePaymentId);
+    return this.receiptStorage.generateAndStore(fp.tenantId, paymentId);
   }
 }

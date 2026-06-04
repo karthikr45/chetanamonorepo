@@ -283,7 +283,7 @@ export class PaymentsService {
   ): Promise<{
     payment: Payment;
     transaction: Transaction;
-    feePaymentId: string | null;
+    paymentId: string | null;
   }> {
     const orderId   = dto.gatewayOrderId   ?? dto.razorpay_order_id;
     const paymentId = dto.gatewayPaymentId ?? dto.razorpay_payment_id;
@@ -303,7 +303,7 @@ export class PaymentsService {
       const transaction = await this.transactionsRepository.findOne({
         where: { paymentId: payment.id, type: TransactionType.PAYMENT_SUCCESS },
       });
-      return { payment, transaction: transaction!, feePaymentId: null };
+      return { payment, transaction: transaction!, paymentId: null };
     }
 
     const gateway = this.gatewayFactory.get(resolvedGateway);
@@ -414,7 +414,7 @@ export class PaymentsService {
     // balance — idempotent by gatewayOrderId, so verify-then-webhook
     // (or vice versa) won't double-count. Non-fatal: the webhook
     // reconciles if this fails.
-    let feePaymentId: string | null = null;
+    let recordedPaymentId: string | null = null;
     if (savedPayment.feeId) {
       try {
         const amountPaisePerUnit =
@@ -427,13 +427,13 @@ export class PaymentsService {
           Number(savedPayment.amount) / amountPaisePerUnit,
           resolvedGateway,
         );
-        feePaymentId = fp.id;
+        recordedPaymentId = fp.id;
       } catch {
         /* webhook safety net */
       }
     }
 
-    return { payment: savedPayment, transaction, feePaymentId };
+    return { payment: savedPayment, transaction, paymentId: recordedPaymentId };
   }
 
   async findAll(tenantId: string): Promise<Payment[]> {

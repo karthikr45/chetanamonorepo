@@ -11,7 +11,6 @@ export type PenaltyTerm =
 export interface PenaltyRuleRow {
   id: string;
   tenantId: string;
-  branch: string | null;
   academicYear: string | null;
   term: PenaltyTerm | null;
   triggerAfterDays: number;
@@ -25,7 +24,6 @@ export interface PenaltyRuleRow {
 }
 
 export interface PenaltyRuleBody {
-  branch?: string;
   academicYear?: string;
   term?: PenaltyTerm;
   triggerAfterDays: number;

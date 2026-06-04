@@ -143,7 +143,7 @@ export interface Fee {
   createdAt: string;
   updatedAt: string;
   /** Latest receipt id for this fee, if any payment has been recorded. */
-  feePaymentId: string | null;
+  paymentId: string | null;
 }
 
 export interface Payment {
@@ -305,7 +305,7 @@ export interface OverviewTerm {
   paymentStatus: "UNPAID" | "PARTIAL" | "PAID";
 }
 export interface OverviewPayment {
-  feePaymentId: string;
+  paymentId: string;
   amount: string;
   paymentType: string;
   paidAt: string;
@@ -355,10 +355,10 @@ export async function fetchOverview(): Promise<{ children: OverviewChild[] }> {
  * Azure) and returns its public URL for the browser to open.
  */
 export async function fetchParentReceiptUrl(
-  feePaymentId: string,
+  paymentId: string,
 ): Promise<string> {
   const { data } = await api.get(
-    `/parent/payments/receipt/${encodeURIComponent(feePaymentId)}`,
+    `/parent/payments/receipt/${encodeURIComponent(paymentId)}`,
   );
   return unwrap<{ url: string }>(data).url;
 }

@@ -42,13 +42,13 @@ export class PublicPayService {
    */
   async getReceiptUrl(
     host: string,
-    feePaymentId: string,
+    paymentId: string,
   ): Promise<{ url: string }> {
     const cfg = await this.resolveConfigByHost(host);
     if (!cfg) {
       throw new NotFoundException('No school is configured for this domain.');
     }
-    return this.receiptStorage.generateAndStore(cfg.tenantId, feePaymentId);
+    return this.receiptStorage.generateAndStore(cfg.tenantId, paymentId);
   }
 
   /**
@@ -154,7 +154,7 @@ export class PublicPayService {
     // Latest receipt (FeePayment) per fee, so the UI can offer a
     // "Download receipt" link for already-paid fees — including those
     // confirmed by the webhook after a gateway redirect (where the
-    // client-side verify never returned a feePaymentId).
+    // client-side verify never returned a paymentId).
     const latestReceiptByFee = new Map<string, string>();
     if (fees.length) {
       const payments = await this.feePaymentRepo.find({
@@ -194,7 +194,7 @@ export class PublicPayService {
         balance: (
           Number(f.netAmount) - Number(f.paidAmount)
         ).toFixed(2),
-        feePaymentId: latestReceiptByFee.get(f.id) ?? null,
+        paymentId: latestReceiptByFee.get(f.id) ?? null,
       })),
     };
   }

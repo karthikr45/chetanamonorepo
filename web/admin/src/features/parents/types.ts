@@ -4,7 +4,6 @@ export interface ParentStudentLink {
   id: string;
   parentId: string;
   tenantId: string;
-  branch: string;
   admissionNumber: string;
   relationship: Relationship;
   isPrimary: boolean;
@@ -29,7 +28,6 @@ export interface CreateParentInput {
   phoneNumber?: string;
   isActive?: boolean;
   students: {
-    branch: string;
     admissionNumber: string;
     relationship?: Relationship;
     isPrimary?: boolean;
