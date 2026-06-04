@@ -93,4 +93,16 @@ export class UpdateStudentDto {
   @IsUrl({}, { message: 'imgUrl must be a valid URL' })
   @MaxLength(2048, { message: 'imgUrl must be 2048 characters or fewer' })
   imgUrl?: string;
+
+  @ApiPropertyOptional({ example: 'Kukatpally Bus Stop', description: 'Transport boarding point.' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(200)
+  pickupLocation?: string;
+
+  @ApiPropertyOptional({ example: 'School Gate', description: 'Transport drop point.' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(200)
+  dropLocation?: string;
 }

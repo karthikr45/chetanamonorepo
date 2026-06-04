@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { SelectMenu } from "@/components/common";
+import { useAuth } from "@/features/auth";
 import type { StudentFeeRow, TermFeeItem } from "@/features/students/types";
 
 export interface EditStudentFormProps {
@@ -47,6 +48,12 @@ export function EditStudentForm({ student, formId, onSubmit, onStatusChangeToPai
   useEffect(() => {
     setForm({ ...student, termFees: { ...student.termFees } });
   }, [student]);
+
+  const { user } = useAuth();
+  const isTransport =
+    (user?.tenantType ?? "").toLowerCase() === "transport" ||
+    form.pickupLocation != null ||
+    form.dropLocation != null;
 
   const set = (field: keyof StudentFeeRow, value: string) =>
     setForm((prev) => ({ ...prev, [field]: value }));
@@ -115,6 +122,16 @@ export function EditStudentForm({ student, formId, onSubmit, onStatusChangeToPai
         <FieldGroup label="Email">
           <input type="email" value={form.email} onChange={(e) => set("email", e.target.value)} className={inputClass} style={inputStyle} />
         </FieldGroup>
+        {isTransport && (
+          <>
+            <FieldGroup label="Boarding Point">
+              <input type="text" value={form.pickupLocation ?? ""} onChange={(e) => set("pickupLocation", e.target.value)} placeholder="e.g. Kukatpally Bus Stop" className={inputClass} style={inputStyle} />
+            </FieldGroup>
+            <FieldGroup label="Drop Point">
+              <input type="text" value={form.dropLocation ?? ""} onChange={(e) => set("dropLocation", e.target.value)} placeholder="e.g. School Gate" className={inputClass} style={inputStyle} />
+            </FieldGroup>
+          </>
+        )}
       </div>
 
       {termNames.length > 0 && (

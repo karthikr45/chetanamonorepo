@@ -39,6 +39,9 @@ export type StudentFeeRow = {
   tcIssuedAt?: string | null;
   /** Canonical person identity (for the full-history view). */
   identityId?: string | null;
+  /** Transport boarding / drop point. */
+  pickupLocation?: string | null;
+  dropLocation?: string | null;
   /** Term-wise fee: "1st Term Fee" -> { amount, paymentStatus } */
   termFees: Record<string, TermFeeItem>;
 };

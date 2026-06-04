@@ -57,7 +57,7 @@ export async function deletePenaltyRuleApi(id: string): Promise<void> {
 
 export async function applyPenaltyManualApi(body: {
   academicYear: string;
-  term: PenaltyTerm;
+  term: string;
   amount: number;
   applyToAll?: boolean;
   admissionNumbers?: string[];
@@ -67,7 +67,7 @@ export async function applyPenaltyManualApi(body: {
 
 export async function waivePenaltyManualApi(body: {
   academicYear: string;
-  term: PenaltyTerm;
+  term: string;
   applyToAll?: boolean;
   admissionNumbers?: string[];
 }): Promise<unknown> {
@@ -108,7 +108,7 @@ export async function waiveDiscountOnFeeApi(
 
 export async function applyDiscountBulkApi(body: {
   academicYear: string;
-  term: PenaltyTerm;
+  term: string;
   amount: number;
   applyToAll?: boolean;
   admissionNumbers?: string[];
@@ -119,7 +119,7 @@ export async function applyDiscountBulkApi(body: {
 
 export async function waiveDiscountBulkApi(body: {
   academicYear: string;
-  term: PenaltyTerm;
+  term: string;
   applyToAll?: boolean;
   admissionNumbers?: string[];
   reason?: string;

@@ -58,6 +58,18 @@ export class UpdateStudentWithFeesDto {
   @IsString()
   admissionNumber?: string;
 
+  @ApiPropertyOptional({ example: 'Kukatpally Bus Stop', maxLength: 200 })
+  @IsOptional()
+  @IsString()
+  @MaxLength(200)
+  pickupLocation?: string;
+
+  @ApiPropertyOptional({ example: 'School Gate', maxLength: 200 })
+  @IsOptional()
+  @IsString()
+  @MaxLength(200)
+  dropLocation?: string;
+
   @ApiPropertyOptional({
     type: 'object',
     additionalProperties: true,

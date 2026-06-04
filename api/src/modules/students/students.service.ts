@@ -124,6 +124,10 @@ export class StudentsService {
     if (dto.section !== undefined) student.section = dto.section;
     if (dto.rollNo !== undefined) student.rollNo = dto.rollNo;
     if (dto.imgUrl !== undefined) student.imgUrl = dto.imgUrl;
+    if (dto.pickupLocation !== undefined)
+      student.pickupLocation = dto.pickupLocation || null;
+    if (dto.dropLocation !== undefined)
+      student.dropLocation = dto.dropLocation || null;
 
     const saved = await this.studentRepo.save(student);
 

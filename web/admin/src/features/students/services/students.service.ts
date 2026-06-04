@@ -115,6 +115,14 @@ function mapApiResultToRow(item: Record<string, unknown>, index: number): Studen
     (base.identityId as string | null | undefined) ??
     (base.identity_id as string | null | undefined) ??
     null;
+  const pickupLocation =
+    (base.pickupLocation as string | null | undefined) ??
+    (base.pickup_location as string | null | undefined) ??
+    null;
+  const dropLocation =
+    (base.dropLocation as string | null | undefined) ??
+    (base.drop_location as string | null | undefined) ??
+    null;
   return {
     _id,
     id,
@@ -129,6 +137,8 @@ function mapApiResultToRow(item: Record<string, unknown>, index: number): Studen
     status,
     tcIssuedAt,
     identityId,
+    pickupLocation,
+    dropLocation,
     termFees: Object.keys(termFees).length > 0 ? termFees : feesArrayMap,
   };
 }
@@ -172,6 +182,14 @@ function mapStudentWithFeesToRow(payload: Record<string, unknown>): StudentFeeRo
     ),
     phone: String(student.phone ?? student.phoneNumber ?? student.mobile ?? ""),
     email: String(student.email ?? student.emailId ?? ""),
+    pickupLocation:
+      (student.pickupLocation as string | null | undefined) ??
+      (student.pickup_location as string | null | undefined) ??
+      null,
+    dropLocation:
+      (student.dropLocation as string | null | undefined) ??
+      (student.drop_location as string | null | undefined) ??
+      null,
     // UI edit form doesn't use these top-level fields for rendering inputs,
     // but they are required by StudentFeeRow type.
     amount: "—",
@@ -310,6 +328,8 @@ export async function updateStudentById(studentId: string, student: StudentFeeRo
     admissionNumber: student.admissionNumber,
     phone: student.phone,
     email: student.email,
+    pickupLocation: student.pickupLocation ?? undefined,
+    dropLocation: student.dropLocation ?? undefined,
     termFees: student.termFees,
   };
   const data = await updateStudentByIdApi(studentId, payload);

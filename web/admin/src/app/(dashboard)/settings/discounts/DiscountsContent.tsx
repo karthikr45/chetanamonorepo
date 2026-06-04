@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { PageHeader } from "@/components/layout";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui";
@@ -9,16 +9,21 @@ import { getApiErrorMessage } from "@/lib/api-client";
 import {
   applyDiscountBulkApi,
   waiveDiscountBulkApi,
-  type PenaltyTerm,
 } from "@/features/configuration/api/penalty-rules.api";
+import { useAuth } from "@/features/auth";
 import { useMetadata } from "@/features/system-metadata/hooks/useMetadata";
 
-const FALLBACK_TERMS: PenaltyTerm[] = [
+const FALLBACK_TERMS = [
   "1st Term Fee",
   "2nd Term Fee",
   "3rd Term Fee",
   "4th Term Fee",
   "5th Term Fee",
+];
+
+const FALLBACK_MONTHS = [
+  "April", "May", "June", "July", "August", "September",
+  "October", "November", "December", "January", "February", "March",
 ];
 
 /**
@@ -28,21 +33,32 @@ const FALLBACK_TERMS: PenaltyTerm[] = [
  * when the caller isn't a tenant/super admin.
  */
 export function DiscountsContent() {
-  const { options: termOpts } = useMetadata("term", {
-    fallback: FALLBACK_TERMS.map((v, i) => ({
+  const { user } = useAuth();
+  // Transport / monthly-billing tenants bill per month, not per term.
+  const isMonthly =
+    (user?.billingMode ?? "").toLowerCase() === "monthly" ||
+    ((user?.tenantType ?? "").toLowerCase() === "transport" && !user?.billingMode);
+  const periodLabel = isMonthly ? "Month" : "Term";
+
+  const { options: periodOpts } = useMetadata(isMonthly ? "month" : "term", {
+    fallback: (isMonthly ? FALLBACK_MONTHS : FALLBACK_TERMS).map((v, i) => ({
       value: v,
       label: v,
       displayOrder: i,
       isActive: true,
     })),
   });
-  const TERMS = termOpts.map((o) => o.value) as PenaltyTerm[];
+  const TERMS = periodOpts.map((o) => o.value);
 
   const [mode, setMode] = useState<"apply" | "waive">("apply");
   const [academicYear, setAcademicYear] = useState("");
-  const [term, setTerm] = useState<PenaltyTerm>(
-    (TERMS[0] ?? "1st Term Fee") as PenaltyTerm,
-  );
+  const [term, setTerm] = useState<string>(TERMS[0] ?? "");
+
+  // Keep the selected period valid once term/month options resolve (e.g. the
+  // tenant's billing mode hydrates after first render).
+  useEffect(() => {
+    if (TERMS.length && !TERMS.includes(term)) setTerm(TERMS[0]);
+  }, [TERMS, term]);
   const [amount, setAmount] = useState("");
   const [reason, setReason] = useState("");
   const [applyToAll, setApplyToAll] = useState(true);
@@ -136,8 +152,8 @@ export function DiscountsContent() {
           <Field label="Academic year" required>
             <AcademicYearSelect value={academicYear} onChange={setAcademicYear} className="form-input" />
           </Field>
-          <Field label="Term" required>
-            <select value={term} onChange={(e) => setTerm(e.target.value as PenaltyTerm)} className="form-input">
+          <Field label={periodLabel} required>
+            <select value={term} onChange={(e) => setTerm(e.target.value)} className="form-input">
               {TERMS.map((t) => (
                 <option key={t} value={t}>
                   {t}

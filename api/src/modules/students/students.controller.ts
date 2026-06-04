@@ -512,6 +512,8 @@ export class StudentsController {
       rollNo: dto.rollNo,
       email: dto.email,
       phoneNumber: dto.phone,
+      pickupLocation: dto.pickupLocation,
+      dropLocation: dto.dropLocation,
     };
     const updatedStudent = await this.studentsService.update(
       tenantId,

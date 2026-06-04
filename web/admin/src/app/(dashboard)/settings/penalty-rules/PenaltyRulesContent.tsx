@@ -5,6 +5,7 @@ import { PageHeader } from "@/components/layout";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui";
 import { AcademicYearSelect } from "@/components/common/AcademicYearSelect";
+import { useAuth } from "@/features/auth";
 import { getApiErrorMessage } from "@/lib/api-client";
 import {
   applyPenaltyManualApi,
@@ -26,6 +27,11 @@ const FALLBACK_TERMS: PenaltyTerm[] = [
   "3rd Term Fee",
   "4th Term Fee",
   "5th Term Fee",
+];
+
+const FALLBACK_MONTHS = [
+  "April", "May", "June", "July", "August", "September",
+  "October", "November", "December", "January", "February", "March",
 ];
 
 type TabId = "rules" | "manual";
@@ -311,21 +317,30 @@ function RulesPanel() {
 // ─── Manual apply / waive panel ────────────────────────────────────
 
 function ManualPanel() {
-  const { options: termOpts } = useMetadata("term", {
-    fallback: FALLBACK_TERMS.map((v, i) => ({
+  const { user } = useAuth();
+  // Transport / monthly-billing tenants apply penalties per month, not term.
+  const isMonthly =
+    (user?.billingMode ?? "").toLowerCase() === "monthly" ||
+    ((user?.tenantType ?? "").toLowerCase() === "transport" && !user?.billingMode);
+  const periodLabel = isMonthly ? "Month" : "Term";
+
+  const { options: periodOpts } = useMetadata(isMonthly ? "month" : "term", {
+    fallback: (isMonthly ? FALLBACK_MONTHS : FALLBACK_TERMS).map((v, i) => ({
       value: v,
       label: v,
       displayOrder: i,
       isActive: true,
     })),
   });
-  const TERMS = termOpts.map((o) => o.value) as PenaltyTerm[];
+  const TERMS = periodOpts.map((o) => o.value);
 
   const [mode, setMode] = useState<"apply" | "waive">("apply");
   const [academicYear, setAcademicYear] = useState("");
-  const [term, setTerm] = useState<PenaltyTerm>(
-    (TERMS[0] ?? "1st Term Fee") as PenaltyTerm,
-  );
+  const [term, setTerm] = useState<string>(TERMS[0] ?? "");
+
+  useEffect(() => {
+    if (TERMS.length && !TERMS.includes(term)) setTerm(TERMS[0]);
+  }, [TERMS, term]);
   const [amount, setAmount] = useState("");
   const [applyToAll, setApplyToAll] = useState(true);
   const [admissionsText, setAdmissionsText] = useState("");
@@ -403,8 +418,8 @@ function ManualPanel() {
             className="form-input"
           />
         </Field>
-        <Field label="Term" required>
-          <select value={term} onChange={(e) => setTerm(e.target.value as PenaltyTerm)} className="form-input">
+        <Field label={periodLabel} required>
+          <select value={term} onChange={(e) => setTerm(e.target.value)} className="form-input">
             {TERMS.map((t) => <option key={t} value={t}>{t}</option>)}
           </select>
         </Field>
