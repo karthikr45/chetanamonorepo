@@ -11,6 +11,8 @@ import {
   StorageSharedKeyCredential,
 } from '@azure/storage-blob';
 import { randomBytes } from 'crypto';
+import { promises as fs } from 'fs';
+import { join } from 'path';
 import { TenantConfig } from '../tenant-configs/entities/tenant-config.entity';
 import { Tenant } from '../tenants/entities/tenant.entity';
 
@@ -202,7 +204,14 @@ export class AzureStorageService {
       throw new BadRequestException('File too large (max 25 MB)');
     }
 
-    const cfg = await this.resolveConfig(args.tenantId);
+    // Generic file uploads (chat attachments) should work even when a tenant
+    // hasn't configured cloud storage — fall back to local disk in that case
+    // so file transfer is functional out of the box.
+    const cfg = await this.resolveConfig(args.tenantId).catch(() => null);
+    if (!cfg || !this.hasAzureStorage(cfg)) {
+      return this.uploadLocal(args);
+    }
+
     const { blobService, container, baseHost } = this.clientFromConfig(cfg);
     const containerClient = blobService.getContainerClient(container);
 
@@ -223,6 +232,49 @@ export class AzureStorageService {
 
     const url = `https://${baseHost}/${container}/${key}`;
     this.logger.log(`Uploaded file ${args.buffer.length}B → ${url}`);
+    return { url, key };
+  }
+
+  /** True when the tenant config carries enough to talk to Azure Blob. */
+  private hasAzureStorage(cfg: TenantConfig): boolean {
+    const hasConn = Boolean(cfg.storageConnectionString?.trim());
+    const hasKeyPair = Boolean(
+      cfg.accessKey?.trim() && cfg.storageSecretKey?.trim(),
+    );
+    const hasContainer = Boolean(cfg.storageContainerName?.trim());
+    return (hasConn || hasKeyPair) && hasContainer;
+  }
+
+  /**
+   * Disk fallback used when a tenant has no cloud storage configured. Writes
+   * the file under LOCAL_UPLOAD_DIR (default ./uploads) and returns a URL
+   * served by the API at `/uploads/...` (see main.ts useStaticAssets). Not
+   * meant for high-scale production — it keeps chat file transfer working in
+   * dev / unconfigured tenants.
+   */
+  private async uploadLocal(args: {
+    buffer: Buffer;
+    mimeType: string;
+    originalName?: string;
+    folder?: string;
+  }): Promise<{ url: string; key: string }> {
+    const baseDir =
+      process.env.LOCAL_UPLOAD_DIR || join(process.cwd(), 'uploads');
+    const folder = sanitizePathSegment(args.folder ?? 'chat-files');
+    const ext = extOf(args.originalName, args.mimeType);
+    const key = `${folder}/${Date.now()}-${randomBytes(8).toString('hex')}${ext}`;
+    const fullPath = join(baseDir, key);
+
+    await fs.mkdir(join(baseDir, folder), { recursive: true });
+    await fs.writeFile(fullPath, args.buffer);
+
+    const base = (
+      process.env.PUBLIC_API_BASE_URL || 'http://localhost:3001'
+    ).replace(/\/$/, '');
+    const url = `${base}/uploads/${key}`;
+    this.logger.log(
+      `Stored file locally ${args.buffer.length}B → ${url} (no tenant cloud storage configured)`,
+    );
     return { url, key };
   }
 

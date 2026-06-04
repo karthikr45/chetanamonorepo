@@ -51,3 +51,6 @@ Thumbs.db
 
 # NestJS
 /dist
+
+# Local upload fallback (chat attachments when no cloud storage)
+/uploads

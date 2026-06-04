@@ -1,6 +1,8 @@
 import { ValidationPipe } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
+import { NestExpressApplication } from '@nestjs/platform-express';
 import { ConfigService } from '@nestjs/config';
+import { join } from 'path';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import helmet from 'helmet';
 import compression from 'compression';
@@ -72,7 +74,7 @@ async function bootstrap() {
       : null,
   );
 
-  const app = await NestFactory.create(AppModule, {
+  const app = await NestFactory.create<NestExpressApplication>(AppModule, {
     rawBody: true,
     bufferLogs: true,
   });
@@ -95,6 +97,20 @@ async function bootstrap() {
 
   // Global prefix
   app.setGlobalPrefix('api');
+
+  // Serve locally-stored uploads (chat-attachment disk fallback for tenants
+  // without cloud storage). Registered at the raw `/uploads` path, outside
+  // the `/api` prefix, matching the URLs AzureStorageService.uploadLocal mints.
+  const uploadsDir =
+    process.env.LOCAL_UPLOAD_DIR || join(process.cwd(), 'uploads');
+  app.useStaticAssets(uploadsDir, {
+    prefix: '/uploads/',
+    // helmet defaults Cross-Origin-Resource-Policy to same-origin, which would
+    // stop the admin web app (different port) from loading these attachments.
+    setHeaders: (res) => {
+      res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
+    },
+  });
 
   // CORS — comma-separated list in CORS_ORIGINS, or "*" to allow all (dev only)
   const corsOriginsRaw =
