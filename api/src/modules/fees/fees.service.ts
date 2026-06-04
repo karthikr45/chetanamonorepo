@@ -6,7 +6,7 @@ import {
 } from '@nestjs/common';
 import { InjectRepository, InjectDataSource } from '@nestjs/typeorm';
 import { DataSource, EntityManager, In, IsNull, Not, Repository } from 'typeorm';
-import { Fee, PaymentStatus, TermType } from './entities/fee.entity';
+import { Fee, PaymentStatus, TermType, FeePeriod } from './entities/fee.entity';
 import {
   SIBLING_TENANT_TYPES,
   TENANT_TYPE,
@@ -297,7 +297,7 @@ async addPenaltyForStudents(
   tenantId: string,
   input: {
     academicYear: string;
-    term: TermType;
+    term: string;
     applyToAll?: boolean;
     admissionNumbers?: string[];
     amount: number;
@@ -391,7 +391,7 @@ async waivePenaltyForStudents(
   tenantId: string,
   input: {
     academicYear: string;
-    term: TermType;
+    term: string;
     applyToAll?: boolean;
     admissionNumbers?: string[];
     reason?: string;
@@ -489,7 +489,7 @@ async waivePenaltyForStudents(
     tenantId: string,
     input: {
       academicYear: string;
-      term: TermType;
+      term: string;
       applyToAll?: boolean;
       admissionNumbers?: string[];
       amount: number;
@@ -588,7 +588,7 @@ async waivePenaltyForStudents(
     tenantId: string,
     input: {
       academicYear: string;
-      term: TermType;
+      term: string;
       applyToAll?: boolean;
       admissionNumbers?: string[];
       reason?: string;

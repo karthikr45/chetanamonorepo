@@ -5,6 +5,7 @@ import {
   IsArray,
   IsBoolean,
   IsEnum,
+  IsIn,
   IsISO8601,
   IsNotEmpty,
   IsNumber,
@@ -15,7 +16,17 @@ import {
   ValidateIf,
 } from 'class-validator';
 import { Type } from 'class-transformer';
-import { TermType, FeePeriod } from '../entities/fee.entity';
+import { TermType, MonthType, FeePeriod } from '../entities/fee.entity';
+
+/**
+ * Valid billing periods: school/hostel term names OR transport month names.
+ * Bulk penalty/discount accept either, so monthly (transport) tenants can
+ * target a specific month.
+ */
+const FEE_PERIOD_VALUES: string[] = [
+  ...Object.values(TermType),
+  ...Object.values(MonthType),
+];
 import { PaymentType } from '../entities/fee-payment.entity';
 
 const OFFLINE_PAYMENT_TYPES: PaymentType[] = [
@@ -68,8 +79,8 @@ export class AddPenaltyDto {
   academicYear: string;
 
   @ApiProperty({ enum: TermType, example: TermType.FIRST })
-  @IsEnum(TermType)
-  term: TermType;
+  @IsIn(FEE_PERIOD_VALUES)
+  term: string;
 
   @ApiPropertyOptional({
     example: false,
@@ -118,8 +129,8 @@ export class WaivePenaltyDto {
   academicYear: string;
 
   @ApiProperty({ enum: TermType, example: TermType.FIRST })
-  @IsEnum(TermType)
-  term: TermType;
+  @IsIn(FEE_PERIOD_VALUES)
+  term: string;
 
   @ApiPropertyOptional({
     example: false,
@@ -298,8 +309,8 @@ export class BulkAddDiscountDto {
   academicYear: string;
 
   @ApiProperty({ enum: TermType, example: TermType.FIRST })
-  @IsEnum(TermType)
-  term: TermType;
+  @IsIn(FEE_PERIOD_VALUES)
+  term: string;
 
   @ApiPropertyOptional({
     example: false,
@@ -349,8 +360,8 @@ export class WaiveDiscountDto {
   academicYear: string;
 
   @ApiProperty({ enum: TermType, example: TermType.FIRST })
-  @IsEnum(TermType)
-  term: TermType;
+  @IsIn(FEE_PERIOD_VALUES)
+  term: string;
 
   @ApiPropertyOptional({ example: false })
   @IsOptional()
