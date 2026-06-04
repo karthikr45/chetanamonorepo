@@ -18,12 +18,23 @@ import { StudentsShimmer } from "@/features/students/components/StudentsShimmer"
 import type { StudentFeeRow } from "@/features/students/types";
 import { getStudentById, updateStudentById } from "@/features/students/services/students.service";
 import { getApiErrorMessage } from "@/lib/api-client";
+import {
+  applyDiscountBulkApi,
+  waiveDiscountBulkApi,
+  type PenaltyTerm,
+} from "@/features/configuration/api/penalty-rules.api";
 import { useMetadata } from "@/features/system-metadata/hooks/useMetadata";
 
 const PAGE_SIZE = 10;
 const BRANCH = "hyd";
 const ACTION_MENU_PLACEHOLDER = "__actions__";
-type ActionMenuValue = "upload" | "addPenalty" | "exportExcel" | "waivePenalty";
+type ActionMenuValue =
+  | "upload"
+  | "addPenalty"
+  | "exportExcel"
+  | "waivePenalty"
+  | "addDiscount"
+  | "waiveDiscount";
 type DynamicColumn = {
   key: string;
   label: string;
@@ -450,6 +461,22 @@ export function ViewPageContent({ onNavigateUpload }: ViewPageContentProps) {
   const [penaltyAmount, setPenaltyAmount] = useState("");
   const [selectedStudentAdmission, setSelectedStudentAdmission] = useState<string[]>(["All"]);
   const [selectedStudentError, setSelectedStudentError] = useState<string | null>(null);
+  // ── Bulk discount (mirror of penalty; hits /fees/discount/add + waive) ──
+  const [discountOpen, setDiscountOpen] = useState(false);
+  const [discountTerm, setDiscountTerm] = useState("");
+  const [discountAmount, setDiscountAmount] = useState("");
+  const [discountReason, setDiscountReason] = useState("");
+  const [discountSelectedStudentAdmission, setDiscountSelectedStudentAdmission] = useState<string[]>(["All"]);
+  const [discountSelectedStudentError, setDiscountSelectedStudentError] = useState<string | null>(null);
+  const [discountLoading, setDiscountLoading] = useState(false);
+  const [discountError, setDiscountError] = useState<string | null>(null);
+  const [waiveDiscountOpen, setWaiveDiscountOpen] = useState(false);
+  const [waiveDiscountTerm, setWaiveDiscountTerm] = useState("");
+  const [waiveDiscountReason, setWaiveDiscountReason] = useState("");
+  const [waiveDiscountSelectedStudentAdmission, setWaiveDiscountSelectedStudentAdmission] = useState<string[]>(["All"]);
+  const [waiveDiscountSelectedStudentError, setWaiveDiscountSelectedStudentError] = useState<string | null>(null);
+  const [waiveDiscountLoading, setWaiveDiscountLoading] = useState(false);
+  const [waiveDiscountError, setWaiveDiscountError] = useState<string | null>(null);
   const [activeFilters, setActiveFilters] = useState<FilterState>(DEFAULT_FILTERS);
   const [draftFilters, setDraftFilters] = useState<FilterState>(DEFAULT_FILTERS);
   const [paymentModal, setPaymentModal] = useState<PaymentModalState>(DEFAULT_PAYMENT_MODAL_STATE);
@@ -607,6 +634,20 @@ export function ViewPageContent({ onNavigateUpload }: ViewPageContentProps) {
     };
   }, [waiveSelectedStudentAdmission, selectableStudentOptions.length]);
 
+  const discountSelectedAdmissionsPayload = useMemo(() => {
+    const selectedWithoutAll = discountSelectedStudentAdmission.filter((a) => a !== "All");
+    const allSelected =
+      discountSelectedStudentAdmission.includes("All") || selectedWithoutAll.length >= selectableStudentOptions.length;
+    return { applyToAll: allSelected, admissionNumbers: allSelected ? [] : selectedWithoutAll };
+  }, [discountSelectedStudentAdmission, selectableStudentOptions.length]);
+
+  const waiveDiscountSelectedAdmissionsPayload = useMemo(() => {
+    const selectedWithoutAll = waiveDiscountSelectedStudentAdmission.filter((a) => a !== "All");
+    const allSelected =
+      waiveDiscountSelectedStudentAdmission.includes("All") || selectedWithoutAll.length >= selectableStudentOptions.length;
+    return { applyToAll: allSelected, admissionNumbers: allSelected ? [] : selectedWithoutAll };
+  }, [waiveDiscountSelectedStudentAdmission, selectableStudentOptions.length]);
+
   const { addPenalty, loading: penaltyLoading } = useAddPenalty(
     academicYear,
     penaltyTerm,
@@ -665,6 +706,59 @@ export function ViewPageContent({ onNavigateUpload }: ViewPageContentProps) {
     if (!success) return;
     setWaivePenaltyOpen(false);
     await refetchStudents();
+  };
+
+  const isAddDiscountDisabled = !discountTerm || !discountAmount.trim();
+
+  const handleAddDiscount = async () => {
+    if (!academicYear) {
+      setDiscountError("Select an academic year first.");
+      return;
+    }
+    if (isAddDiscountDisabled) return;
+    setDiscountLoading(true);
+    setDiscountError(null);
+    try {
+      await applyDiscountBulkApi({
+        academicYear,
+        term: discountTerm as PenaltyTerm,
+        amount: parseFloat(discountAmount),
+        applyToAll: discountSelectedAdmissionsPayload.applyToAll,
+        admissionNumbers: discountSelectedAdmissionsPayload.admissionNumbers,
+        reason: discountReason.trim() || undefined,
+      });
+      setDiscountOpen(false);
+      await refetchStudents();
+    } catch (err) {
+      setDiscountError(getApiErrorMessage(err, "Failed to add discount"));
+    } finally {
+      setDiscountLoading(false);
+    }
+  };
+
+  const handleWaiveDiscount = async () => {
+    if (!academicYear) {
+      setWaiveDiscountError("Select an academic year first.");
+      return;
+    }
+    if (!waiveDiscountTerm) return;
+    setWaiveDiscountLoading(true);
+    setWaiveDiscountError(null);
+    try {
+      await waiveDiscountBulkApi({
+        academicYear,
+        term: waiveDiscountTerm as PenaltyTerm,
+        applyToAll: waiveDiscountSelectedAdmissionsPayload.applyToAll,
+        admissionNumbers: waiveDiscountSelectedAdmissionsPayload.admissionNumbers,
+        reason: waiveDiscountReason.trim() || undefined,
+      });
+      setWaiveDiscountOpen(false);
+      await refetchStudents();
+    } catch (err) {
+      setWaiveDiscountError(getApiErrorMessage(err, "Failed to waive discount"));
+    } finally {
+      setWaiveDiscountLoading(false);
+    }
   };
 
   const handlePaymentModalSave = () => {
@@ -925,6 +1019,25 @@ export function ViewPageContent({ onNavigateUpload }: ViewPageContentProps) {
     setPenaltyOpen(true);
   };
 
+  const openAddDiscountModal = () => {
+    setDiscountTerm("");
+    setDiscountAmount("");
+    setDiscountReason("");
+    setDiscountSelectedStudentAdmission(["All"]);
+    setDiscountSelectedStudentError(null);
+    setDiscountError(null);
+    setDiscountOpen(true);
+  };
+
+  const openWaiveDiscountModal = () => {
+    setWaiveDiscountTerm("");
+    setWaiveDiscountReason("");
+    setWaiveDiscountSelectedStudentAdmission(["All"]);
+    setWaiveDiscountSelectedStudentError(null);
+    setWaiveDiscountError(null);
+    setWaiveDiscountOpen(true);
+  };
+
   const openWaivePenaltyModal = () => {
     setWaivePenaltyTerm("");
     setWaiveSelectedStudentAdmission(["All"]);
@@ -943,6 +1056,10 @@ export function ViewPageContent({ onNavigateUpload }: ViewPageContentProps) {
       handleExportExcel();
     } else if (action === "waivePenalty") {
       openWaivePenaltyModal();
+    } else if (action === "addDiscount") {
+      openAddDiscountModal();
+    } else if (action === "waiveDiscount") {
+      openWaiveDiscountModal();
     }
     setActionMenuValue(ACTION_MENU_PLACEHOLDER);
   };
@@ -986,8 +1103,10 @@ export function ViewPageContent({ onNavigateUpload }: ViewPageContentProps) {
               options={[
                 { value: "upload", label: "Upload" },
                 { value: "addPenalty", label: "Add Penalty" },
-                { value: "exportExcel", label: "Export Excel" },
                 { value: "waivePenalty", label: "Waive Off Penalty" },
+                { value: "addDiscount", label: "Apply Discount" },
+                { value: "waiveDiscount", label: "Waive Off Discount" },
+                { value: "exportExcel", label: "Export Excel" },
               ]}
             />
             <SelectMenu
@@ -1615,6 +1734,201 @@ export function ViewPageContent({ onNavigateUpload }: ViewPageContentProps) {
           {waivePenaltyError && (
             <p className="text-xs font-medium" style={{ color: "var(--app-error, #dc2626)" }}>
               {waivePenaltyError}
+            </p>
+          )}
+        </div>
+      </Modal>
+
+      {/* Apply Discount Modal */}
+      <Modal
+        open={discountOpen}
+        onClose={() => setDiscountOpen(false)}
+        title="Apply Discount"
+        size="sm"
+        footer={
+          <>
+            <button
+              type="button"
+              onClick={() => setDiscountOpen(false)}
+              className="h-10 rounded-lg border px-5 text-sm font-medium transition-colors hover:bg-[var(--app-nav-hover-bg)] cursor-pointer"
+              style={{ borderColor: "var(--app-search-border)", color: "var(--app-text-primary)" }}
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              form="add-discount-form"
+              disabled={isAddDiscountDisabled || discountLoading}
+              className="h-10 rounded-lg px-5 text-sm font-medium text-white transition-colors hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50 cursor-pointer"
+              style={{ backgroundColor: "var(--app-brand)" }}
+            >
+              {discountLoading ? "Applying..." : "Apply Discount"}
+            </button>
+          </>
+        }
+      >
+        <form
+          id="add-discount-form"
+          onSubmit={(e) => {
+            e.preventDefault();
+            void handleAddDiscount();
+          }}
+          className="space-y-4"
+        >
+          <div className="flex flex-col gap-1.5">
+            <label className="text-xs font-medium uppercase tracking-wide" style={{ color: "var(--app-text-secondary)" }}>
+              Select Student
+            </label>
+            <StudentMultiSelect
+              selected={discountSelectedStudentAdmission}
+              onChange={(admissions) => {
+                setDiscountSelectedStudentAdmission(admissions);
+                setDiscountSelectedStudentError(null);
+              }}
+              options={selectableStudentOptions}
+              maxSelection={500}
+              onSelectionError={setDiscountSelectedStudentError}
+            />
+            {discountSelectedStudentError && (
+              <p className="text-xs font-medium" style={{ color: "var(--app-error, #dc2626)" }}>
+                {discountSelectedStudentError}
+              </p>
+            )}
+          </div>
+          <div className="flex flex-col gap-1.5">
+            <label className="text-xs font-medium uppercase tracking-wide" style={{ color: "var(--app-text-secondary)" }}>
+              Term
+            </label>
+            <select
+              value={discountTerm}
+              onChange={(e) => setDiscountTerm(e.target.value)}
+              required
+              className="h-10 w-full rounded-lg border px-3 text-sm outline-none transition-colors focus:ring-2 focus:ring-[var(--app-search-focus)]/20"
+              style={{ borderColor: "var(--app-search-border)", backgroundColor: "var(--app-card-bg)", color: "var(--app-text-primary)" }}
+            >
+              <option value="" disabled>Select term</option>
+              {termHeaders.map((t) => (
+                <option key={t} value={t}>{t}</option>
+              ))}
+            </select>
+          </div>
+          <div className="flex flex-col gap-1.5">
+            <label className="text-xs font-medium uppercase tracking-wide" style={{ color: "var(--app-text-secondary)" }}>
+              Discount Amount
+            </label>
+            <input
+              type="number"
+              min="1"
+              value={discountAmount}
+              onChange={(e) => setDiscountAmount(e.target.value)}
+              required
+              placeholder="Enter amount"
+              className="h-10 w-full rounded-lg border px-3 text-sm outline-none transition-colors focus:ring-2 focus:ring-[var(--app-search-focus)]/20"
+              style={{ borderColor: "var(--app-search-border)", backgroundColor: "var(--app-card-bg)", color: "var(--app-text-primary)" }}
+            />
+          </div>
+          <div className="flex flex-col gap-1.5">
+            <label className="text-xs font-medium uppercase tracking-wide" style={{ color: "var(--app-text-secondary)" }}>
+              Reason (optional)
+            </label>
+            <input
+              type="text"
+              value={discountReason}
+              onChange={(e) => setDiscountReason(e.target.value)}
+              placeholder="e.g. Sibling concession"
+              className="h-10 w-full rounded-lg border px-3 text-sm outline-none transition-colors focus:ring-2 focus:ring-[var(--app-search-focus)]/20"
+              style={{ borderColor: "var(--app-search-border)", backgroundColor: "var(--app-card-bg)", color: "var(--app-text-primary)" }}
+            />
+          </div>
+          {discountError && (
+            <p className="text-xs font-medium" style={{ color: "var(--app-error, #dc2626)" }}>
+              {discountError}
+            </p>
+          )}
+        </form>
+      </Modal>
+
+      {/* Waive Discount Modal */}
+      <Modal
+        open={waiveDiscountOpen}
+        onClose={() => setWaiveDiscountOpen(false)}
+        title="Waive Off Discount"
+        size="sm"
+        footer={
+          <>
+            <button
+              type="button"
+              onClick={() => setWaiveDiscountOpen(false)}
+              className="h-10 rounded-lg border px-5 text-sm font-medium transition-colors hover:bg-[var(--app-nav-hover-bg)] cursor-pointer"
+              style={{ borderColor: "var(--app-search-border)", color: "var(--app-text-primary)" }}
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                void handleWaiveDiscount();
+              }}
+              disabled={!waiveDiscountTerm || waiveDiscountLoading}
+              className="h-10 rounded-lg px-5 text-sm font-medium text-white transition-colors hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+              style={{ backgroundColor: "var(--app-brand)" }}
+            >
+              {waiveDiscountLoading ? "Submitting..." : "Submit"}
+            </button>
+          </>
+        }
+      >
+        <div className="space-y-4">
+          <div className="flex flex-col gap-1.5">
+            <label className="text-xs font-medium uppercase tracking-wide" style={{ color: "var(--app-text-secondary)" }}>
+              Select Student
+            </label>
+            <StudentMultiSelect
+              selected={waiveDiscountSelectedStudentAdmission}
+              onChange={(admissions) => {
+                setWaiveDiscountSelectedStudentAdmission(admissions);
+                setWaiveDiscountSelectedStudentError(null);
+              }}
+              options={selectableStudentOptions}
+              maxSelection={500}
+              onSelectionError={setWaiveDiscountSelectedStudentError}
+            />
+            {waiveDiscountSelectedStudentError && (
+              <p className="text-xs font-medium" style={{ color: "var(--app-error, #dc2626)" }}>
+                {waiveDiscountSelectedStudentError}
+              </p>
+            )}
+          </div>
+          <label className="block text-sm font-medium" style={{ color: "var(--app-text-primary)" }}>
+            Select The Term
+          </label>
+          <select
+            value={waiveDiscountTerm}
+            onChange={(e) => setWaiveDiscountTerm(e.target.value)}
+            className="h-10 w-full rounded-lg border px-3 text-sm outline-none transition-colors focus:ring-2 focus:ring-[var(--app-search-focus)]/20"
+            style={{ borderColor: "var(--app-search-border)", backgroundColor: "var(--app-card-bg)", color: "var(--app-text-primary)" }}
+          >
+            <option value="" disabled>Select The Term</option>
+            {termHeaders.map((t) => (
+              <option key={t} value={t}>{t}</option>
+            ))}
+          </select>
+          <div className="flex flex-col gap-1.5">
+            <label className="text-xs font-medium uppercase tracking-wide" style={{ color: "var(--app-text-secondary)" }}>
+              Reason (optional)
+            </label>
+            <input
+              type="text"
+              value={waiveDiscountReason}
+              onChange={(e) => setWaiveDiscountReason(e.target.value)}
+              placeholder="e.g. Concession revoked"
+              className="h-10 w-full rounded-lg border px-3 text-sm outline-none transition-colors focus:ring-2 focus:ring-[var(--app-search-focus)]/20"
+              style={{ borderColor: "var(--app-search-border)", backgroundColor: "var(--app-card-bg)", color: "var(--app-text-primary)" }}
+            />
+          </div>
+          {waiveDiscountError && (
+            <p className="text-xs font-medium" style={{ color: "var(--app-error, #dc2626)" }}>
+              {waiveDiscountError}
             </p>
           )}
         </div>

@@ -47,6 +47,7 @@ const tenantAdminNav: NavItem[] = [
     children: [
       { href: "/settings/academic-years", label: "Academic Years" },
       { href: "/settings/penalty-rules", label: "Penalty Rules" },
+      { href: "/settings/discounts", label: "Discounts" },
       { href: "/settings/users", label: "Users & Roles" },
       { href: "/settings/receipt-sequence", label: "Receipt Sequence" },
       { href: "/settings/receipt-templates", label: "Receipt Templates" },
