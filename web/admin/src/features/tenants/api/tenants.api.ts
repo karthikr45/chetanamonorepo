@@ -15,6 +15,9 @@ export type TenantConfig = {
   logoUrl: string;
   receiptLogoUrl: string;
   domainUrl: string;
+  privacyPolicyUrl: string;
+  termsAndConditionsUrl: string;
+  refundPolicyUrl: string;
   storageTab: "accessKeys" | "connectionString";
   accessKey: string;
   secretKey: string;
@@ -138,6 +141,12 @@ function mapRemoteTenantConfigToPayload(row: unknown): SaveTenantConfigPayload {
     logoUrl: pickStr(r, ["logoUrl", "logo_url"]),
     receiptLogoUrl: pickStr(r, ["receiptLogoUrl", "receipt_logo_url"]),
     domainUrl: pickStr(r, ["domainUrl", "domain_url"]),
+    privacyPolicyUrl: pickStr(r, ["privacyPolicyUrl", "privacy_policy_url"]),
+    termsAndConditionsUrl: pickStr(r, [
+      "termsAndConditionsUrl",
+      "terms_and_conditions_url",
+    ]),
+    refundPolicyUrl: pickStr(r, ["refundPolicyUrl", "refund_policy_url"]),
     storageTab,
     accessKey,
     secretKey,

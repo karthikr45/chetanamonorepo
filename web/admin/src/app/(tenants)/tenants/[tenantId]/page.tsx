@@ -27,6 +27,9 @@ type NewConfig = {
   logoUrl: string;
   receiptLogoUrl: string;
   domainUrl: string;
+  privacyPolicyUrl: string;
+  termsAndConditionsUrl: string;
+  refundPolicyUrl: string;
   storageTab: "accessKeys" | "connectionString";
   accessKey: string;
   secretKey: string;
@@ -51,6 +54,9 @@ const emptyConfig: NewConfig = {
   logoUrl: "",
   receiptLogoUrl: "",
   domainUrl: "",
+  privacyPolicyUrl: "",
+  termsAndConditionsUrl: "",
+  refundPolicyUrl: "",
   storageTab: "accessKeys",
   accessKey: "",
   secretKey: "",
@@ -82,7 +88,17 @@ function validateNewConfigField(field: keyof NewConfig, value: string): string {
   // *format* of values the user has typed something into.
   const trimmed = value.trim();
   if (!trimmed) return "";
-  if (["logoUrl", "receiptLogoUrl", "domainUrl", "webhookUrl"].includes(field)) {
+  if (
+    [
+      "logoUrl",
+      "receiptLogoUrl",
+      "domainUrl",
+      "webhookUrl",
+      "privacyPolicyUrl",
+      "termsAndConditionsUrl",
+      "refundPolicyUrl",
+    ].includes(field)
+  ) {
     if (!/^https?:\/\//.test(trimmed)) return "Enter a valid URL";
   }
   if (field === "smtpFromEmail" && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmed)) {
@@ -402,6 +418,9 @@ function TenantDetailsPageContent() {
         logoUrl: newConfig.logoUrl,
         receiptLogoUrl: newConfig.receiptLogoUrl,
         domainUrl: newConfig.domainUrl,
+        privacyPolicyUrl: newConfig.privacyPolicyUrl,
+        termsAndConditionsUrl: newConfig.termsAndConditionsUrl,
+        refundPolicyUrl: newConfig.refundPolicyUrl,
         storageTab: newConfig.storageTab,
         accessKey: newConfig.accessKey,
         secretKey: newConfig.secretKey,
@@ -672,6 +691,31 @@ function TenantDetailsPageContent() {
                 value={newConfig.domainUrl}
                 onChange={(e) => updateNew({ domainUrl: e.target.value })}
                 error={newConfigErrors.domainUrl}
+                fullWidth
+                className="sm:col-span-2"
+              />
+              <Input
+                label="Privacy Policy URL"
+                placeholder="https://example.com/privacy"
+                value={newConfig.privacyPolicyUrl}
+                onChange={(e) => updateNew({ privacyPolicyUrl: e.target.value })}
+                error={newConfigErrors.privacyPolicyUrl}
+                fullWidth
+              />
+              <Input
+                label="Terms & Conditions URL"
+                placeholder="https://example.com/terms"
+                value={newConfig.termsAndConditionsUrl}
+                onChange={(e) => updateNew({ termsAndConditionsUrl: e.target.value })}
+                error={newConfigErrors.termsAndConditionsUrl}
+                fullWidth
+              />
+              <Input
+                label="Refund Policy URL"
+                placeholder="https://example.com/refund"
+                value={newConfig.refundPolicyUrl}
+                onChange={(e) => updateNew({ refundPolicyUrl: e.target.value })}
+                error={newConfigErrors.refundPolicyUrl}
                 fullWidth
                 className="sm:col-span-2"
               />

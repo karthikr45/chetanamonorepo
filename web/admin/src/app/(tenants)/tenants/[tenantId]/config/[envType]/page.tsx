@@ -24,6 +24,9 @@ function emptyTenantConfigForm(): TenantConfigForm {
     logoUrl: "",
     receiptLogoUrl: "",
     domainUrl: "",
+    privacyPolicyUrl: "",
+    termsAndConditionsUrl: "",
+    refundPolicyUrl: "",
     storageTab: "accessKeys",
     accessKey: "",
     secretKey: "",
@@ -52,6 +55,9 @@ function serverConfigToForm(row: SaveTenantConfigPayload): TenantConfigForm {
     logoUrl: row.logoUrl ?? "",
     receiptLogoUrl: row.receiptLogoUrl ?? "",
     domainUrl: row.domainUrl ?? "",
+    privacyPolicyUrl: row.privacyPolicyUrl ?? "",
+    termsAndConditionsUrl: row.termsAndConditionsUrl ?? "",
+    refundPolicyUrl: row.refundPolicyUrl ?? "",
     storageTab,
     accessKey: row.accessKey ?? "",
     secretKey: row.secretKey ?? "",
@@ -178,7 +184,17 @@ export default function EnvConfigPage() {
     // when the user *has* typed something into a field.
     const trimmed = value.trim();
     if (!trimmed) return "";
-    if (["logoUrl", "receiptLogoUrl", "domainUrl", "webhookUrl"].includes(field)) {
+    if (
+      [
+        "logoUrl",
+        "receiptLogoUrl",
+        "domainUrl",
+        "webhookUrl",
+        "privacyPolicyUrl",
+        "termsAndConditionsUrl",
+        "refundPolicyUrl",
+      ].includes(field)
+    ) {
       if (!/^https?:\/\//.test(trimmed)) return "Enter a valid URL";
     }
     if (field === "smtpFromEmail" && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmed)) {
@@ -196,6 +212,9 @@ export default function EnvConfigPage() {
       "logoUrl",
       "receiptLogoUrl",
       "domainUrl",
+      "privacyPolicyUrl",
+      "termsAndConditionsUrl",
+      "refundPolicyUrl",
       "gatewayType",
       "paymentKey",
       "paymentSecret",
@@ -228,6 +247,9 @@ export default function EnvConfigPage() {
       logoUrl: config.logoUrl,
       receiptLogoUrl: config.receiptLogoUrl,
       domainUrl: config.domainUrl,
+      privacyPolicyUrl: config.privacyPolicyUrl,
+      termsAndConditionsUrl: config.termsAndConditionsUrl,
+      refundPolicyUrl: config.refundPolicyUrl,
       storageTab: config.storageTab,
       accessKey: config.accessKey,
       secretKey: config.secretKey,
@@ -349,6 +371,33 @@ export default function EnvConfigPage() {
             value={config.domainUrl}
             onChange={(e) => updateConfig({ domainUrl: e.target.value })}
             error={errors.domainUrl}
+            fullWidth
+          />
+        </ConfigSection>
+
+        <ConfigSection title="Legal / Policy URLs">
+          <Input
+            label="Privacy Policy URL"
+            placeholder="https://example.com/privacy"
+            value={config.privacyPolicyUrl}
+            onChange={(e) => updateConfig({ privacyPolicyUrl: e.target.value })}
+            error={errors.privacyPolicyUrl}
+            fullWidth
+          />
+          <Input
+            label="Terms & Conditions URL"
+            placeholder="https://example.com/terms"
+            value={config.termsAndConditionsUrl}
+            onChange={(e) => updateConfig({ termsAndConditionsUrl: e.target.value })}
+            error={errors.termsAndConditionsUrl}
+            fullWidth
+          />
+          <Input
+            label="Refund Policy URL"
+            placeholder="https://example.com/refund"
+            value={config.refundPolicyUrl}
+            onChange={(e) => updateConfig({ refundPolicyUrl: e.target.value })}
+            error={errors.refundPolicyUrl}
             fullWidth
           />
         </ConfigSection>
