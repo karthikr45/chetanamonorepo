@@ -57,6 +57,16 @@ function fileSize(n: number | null) {
   if (n < 1024 * 1024) return `${(n / 1024).toFixed(0)} KB`;
   return `${(n / 1024 / 1024).toFixed(1)} MB`;
 }
+
+/** A file staged in the composer. It uploads to the API immediately on attach;
+ *  `attachment` holds the stored {url,name,mime,size} once done. */
+type PendingFile = {
+  localId: string;
+  file: File;
+  status: "uploading" | "done" | "error";
+  attachment?: MessageAttachment;
+  error?: string;
+};
 function isImage(mime: string | null) {
   return !!mime && /^image\//i.test(mime);
 }
@@ -117,7 +127,7 @@ export function ChatPageContent() {
   const [error, setError] = useState<string | null>(null);
   const [sending, setSending] = useState(false);
   const [replyTo, setReplyTo] = useState<ChatMessage | null>(null);
-  const [pendingFiles, setPendingFiles] = useState<File[]>([]);
+  const [pendingFiles, setPendingFiles] = useState<PendingFile[]>([]);
   const [dragOver, setDragOver] = useState(false);
   const [peerTyping, setPeerTyping] = useState(false);
   const [editing, setEditing] = useState<ChatMessage | null>(null);
@@ -145,7 +155,48 @@ export function ChatPageContent() {
 
   const addFiles = (fl: FileList | null) => {
     if (!fl?.length) return;
-    setPendingFiles((p) => [...p, ...Array.from(fl)].slice(0, 10));
+    const conv = activeConvRef.current;
+    if (!conv) {
+      setError("Open a conversation before attaching a file.");
+      return;
+    }
+    setError(null);
+    const entries: PendingFile[] = Array.from(fl)
+      .slice(0, 10)
+      .map((file) => ({
+        localId: `${Date.now()}-${Math.random().toString(36).slice(2)}`,
+        file,
+        status: "uploading" as const,
+      }));
+    setPendingFiles((p) => [...p, ...entries].slice(0, 10));
+
+    // Upload each file to the API right away so there's immediate feedback
+    // and any storage error surfaces now rather than at send time.
+    for (const e of entries) {
+      uploadAttachmentApi(conv, e.file)
+        .then((attachment) =>
+          setPendingFiles((p) =>
+            p.map((x) =>
+              x.localId === e.localId
+                ? { ...x, status: "done", attachment }
+                : x,
+            ),
+          ),
+        )
+        .catch((err) =>
+          setPendingFiles((p) =>
+            p.map((x) =>
+              x.localId === e.localId
+                ? {
+                    ...x,
+                    status: "error",
+                    error: getApiErrorMessage(err, "Upload failed"),
+                  }
+                : x,
+            ),
+          ),
+        );
+    }
   };
 
   const loadAll = useCallback(async () => {
@@ -343,12 +394,22 @@ export function ChatPageContent() {
     }
 
     if (!text && pendingFiles.length === 0) return;
+    // Files upload on attach; don't send until they've all finished.
+    if (pendingFiles.some((f) => f.status === "uploading")) {
+      setError("Please wait for attachments to finish uploading.");
+      return;
+    }
+    if (pendingFiles.some((f) => f.status === "error")) {
+      setError("Remove the failed attachment(s) before sending.");
+      return;
+    }
+    const attachments: MessageAttachment[] = pendingFiles
+      .map((f) => f.attachment)
+      .filter((a): a is MessageAttachment => !!a);
+    if (!text && attachments.length === 0) return;
+
     setSending(true);
     try {
-      const attachments: MessageAttachment[] = [];
-      for (const f of pendingFiles) {
-        attachments.push(await uploadAttachmentApi(activeConvId, f));
-      }
       const msg = await sendMessageApi(activeConvId, {
         body: text || undefined,
         replyToId: replyTo?.id ?? null,
@@ -1119,22 +1180,33 @@ export function ChatPageContent() {
                 )}
                 {pendingFiles.length > 0 && (
                   <div className="flex flex-wrap gap-2">
-                    {pendingFiles.map((f, i) => (
+                    {pendingFiles.map((f) => (
                       <div
-                        key={i}
-                        className="flex items-center gap-2 px-3 py-2 rounded-xl text-[12px] bg-[#f7ece9] border border-[#e7c9c2]"
+                        key={f.localId}
+                        className={`flex items-center gap-2 px-3 py-2 rounded-xl text-[12px] border ${
+                          f.status === "error"
+                            ? "bg-red-50 border-red-200"
+                            : "bg-[#f7ece9] border-[#e7c9c2]"
+                        }`}
+                        title={f.status === "error" ? f.error : undefined}
                       >
-                        <span className="text-base">📎</span>
-                        <span className="max-w-[160px] truncate text-slate-700 font-medium">
-                          {f.name}
+                        <span className="text-base">
+                          {f.status === "uploading" ? "⏳" : f.status === "error" ? "⚠️" : "📎"}
                         </span>
-                        <span className="text-slate-500">
-                          {fileSize(f.size)}
+                        <span className="max-w-[160px] truncate text-slate-700 font-medium">
+                          {f.file.name}
+                        </span>
+                        <span className={f.status === "error" ? "text-red-600" : "text-slate-500"}>
+                          {f.status === "uploading"
+                            ? "uploading…"
+                            : f.status === "error"
+                              ? "failed"
+                              : fileSize(f.file.size)}
                         </span>
                         <button
                           onClick={() =>
                             setPendingFiles((p) =>
-                              p.filter((_, idx) => idx !== i),
+                              p.filter((x) => x.localId !== f.localId),
                             )
                           }
                           className="text-slate-400 hover:text-slate-700 text-sm"
