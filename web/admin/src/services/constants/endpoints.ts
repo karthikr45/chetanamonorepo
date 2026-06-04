@@ -28,10 +28,10 @@ export const API_ENDPOINTS = {
     getAcademicYears: "/academic-years",
     /** GET: /students/by-admission/with-fees?admissionNumber=...&academicYear=... */
     getStudentByAdmission: "/students/by-admission/with-fees",
-    /** POST: apply a penalty to a fee/term. */
-    addPenalty: "/penalties",
-    /** POST: waive an existing penalty. */
-    waivePenalty: "/penalties/waive",
+    /** POST: bulk-apply a penalty for a term (all / selected admissions). */
+    addPenalty: "/fees/penalty/add",
+    /** POST: bulk-waive a penalty for a term (all / selected admissions). */
+    waivePenalty: "/fees/penalty/waive",
     /** POST: parent-portal-style direct order creation (admin "Pay Now" flow). */
     createOrder: "/payments/create-order",
     /** POST: validate an Excel before commit. */
