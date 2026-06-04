@@ -238,6 +238,8 @@ function TenantManagement() {
     const optional = new Set<string>([
       "schoolCode",
       "tenantCode",
+      // Redundant with `name`; mirrored on save, so not asked for separately.
+      "tenantName",
       "receiptPrefix",
       "receiptResetPolicy",
       "receiptStartNumber",
@@ -288,7 +290,8 @@ function TenantManagement() {
     setSaving(true);
     setSaveError("");
     try {
-      const dataToSave = { ...formData, tenantCode: generatedTenantCode, receiptPrefix: formData.code };
+      // `tenantName` is redundant with `name` — keep them in sync.
+      const dataToSave = { ...formData, tenantName: formData.name, tenantCode: generatedTenantCode, receiptPrefix: formData.code };
       if (editingTenant) {
         await updateTenant(editingTenant.id, dataToSave);
       } else {
@@ -507,16 +510,6 @@ function TenantManagement() {
                   )}
                 </div>
               </div>
-
-              <Input
-                label="Tenant Name"
-                placeholder="e.g. Ushodaya High School"
-                value={formData.tenantName}
-                onChange={(e) => setFormData({ ...formData, tenantName: e.target.value })}
-                error={formErrors.tenantName}
-                required
-                fullWidth
-              />
 
               <div className="sm:col-span-2">
                 <Input

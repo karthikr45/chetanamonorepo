@@ -55,6 +55,9 @@ export class TenantsService {
 
     const tenant = this.tenantsRepository.create({
       ...dto,
+      // `tenantName` is redundant with `name` — default it to `name` so the
+      // client only needs to supply a single name.
+      tenantName: dto.tenantName?.trim() || dto.name,
       type: type ?? undefined,
       clientId,
       secretKey,
@@ -97,6 +100,11 @@ export class TenantsService {
     const normalised: UpdateTenantDto = { ...dto };
     if (dto.type !== undefined) {
       normalised.type = normaliseTenantType(dto.type) ?? dto.type;
+    }
+    // Keep the redundant `tenantName` in sync with `name` when only `name`
+    // is sent (the form now exposes a single name field).
+    if (dto.name !== undefined && dto.tenantName === undefined) {
+      normalised.tenantName = dto.name;
     }
     Object.assign(tenant, normalised);
     return this.sanitize(await this.tenantsRepository.save(tenant));

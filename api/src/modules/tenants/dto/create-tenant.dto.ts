@@ -43,10 +43,15 @@ export class CreateTenantDto {
   })
   tenantCode: string;
 
-  @ApiProperty({ example: 'Sunrise Tenant' })
+  /**
+   * Display name. Redundant with `name` — kept for backward compatibility
+   * but no longer required from the client; the service defaults it to
+   * `name` when omitted, so callers only need to send one name.
+   */
+  @ApiPropertyOptional({ example: 'Sunrise High School' })
   @IsString()
-  @IsNotEmpty()
-  tenantName: string;
+  @IsOptional()
+  tenantName?: string;
 
   @ApiPropertyOptional({ example: 'English' })
   @IsString()
