@@ -34,6 +34,8 @@ export type StudentFeeRow = {
   admissionNumber: string;
   phone: string;
   email: string;
+  /** Academic year of this enrollment (e.g. "2026-2027"). */
+  academicYear?: string;
   amount: string;
   status: "Paid" | "Pending";
   feeId?: string;

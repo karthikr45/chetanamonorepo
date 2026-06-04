@@ -34,6 +34,7 @@ import {
   assembleReceiptNumber,
   assembleCompactReceiptNumber,
   deriveStatus as deriveStatusPure,
+  isPastAcademicMonth,
 } from './fee-math';
 
 
@@ -288,10 +289,11 @@ export class FeesService {
    * screen. Monthly (transport) tenants use this to add a month that wasn't
    * billed yet, or change the boarding / drop point month-wise.
    *
-   * IMMUTABILITY RULE: once a fee exists its amount and discount are fixed —
-   * they can never be edited here (or from an Excel re-upload). Only the
-   * operational boarding/drop point may change on an existing fee. Missing
-   * periods are still created when an amount is given.
+   * IMMUTABILITY RULE: a fee's amount/discount is frozen once its month has
+   * elapsed — a PAST month can never be edited here (or from an Excel
+   * re-upload). The current and upcoming months stay editable so fees can be
+   * revised. The operational boarding/drop point may change for any month,
+   * and missing periods are still created when an amount is given.
    */
   async applyPeriodFeeEdits(
     tenantId: string,
@@ -324,9 +326,38 @@ export class FeesService {
         });
 
         if (fee) {
-          // Amount / discount are immutable once the fee exists — ignore any
-          // amount/discount in the edit. Only boarding/drop may change.
           let touched = false;
+
+          // A past (elapsed) month's amount/discount is frozen. The current
+          // and upcoming months stay editable so fees can still be revised.
+          const past = isPastAcademicMonth(academicYear, edit.term);
+          let amountChanged = false;
+          if (!past) {
+            if (edit.amount !== undefined) {
+              fee.originalAmount = Math.max(0, edit.amount).toFixed(2);
+              amountChanged = true;
+            }
+            if (edit.discount !== undefined) {
+              fee.totalDiscount = Math.max(0, edit.discount).toFixed(2);
+              amountChanged = true;
+            }
+          }
+          if (amountChanged) {
+            if (Number(fee.totalDiscount) > Number(fee.originalAmount)) {
+              throw new BadRequestException(
+                `${edit.term}: discount cannot exceed the fee amount.`,
+              );
+            }
+            this.recomputeDerived(fee);
+            if (Number(fee.netAmount) < Number(fee.paidAmount) - 0.01) {
+              throw new BadRequestException(
+                `${edit.term}: amount cannot be reduced below the ₹${fee.paidAmount} already paid.`,
+              );
+            }
+            touched = true;
+          }
+
+          // Boarding/drop stay editable for any month.
           if (edit.pickupLocation !== undefined) {
             fee.pickupLocation = edit.pickupLocation || null;
             touched = true;

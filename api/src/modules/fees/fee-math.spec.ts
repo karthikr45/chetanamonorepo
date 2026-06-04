@@ -8,6 +8,7 @@ import {
   assembleCompactReceiptNumber,
   compactAcademicYear,
   deriveStatus,
+  isPastAcademicMonth,
 } from './fee-math';
 
 describe('fee-math', () => {
@@ -153,5 +154,39 @@ describe('fee-math', () => {
     it('over net → PAID (never regresses)', () => {
       expect(deriveStatus(1200, 1000)).toBe(PaymentStatus.PAID);
     });
+  });
+});
+
+describe('isPastAcademicMonth', () => {
+  // Anchor "now" at 15 Aug 2026 (academic year 2026-2027).
+  const now = new Date('2026-08-15T00:00:00Z');
+  const AY = '2026-2027';
+
+  it('treats already-elapsed months as past', () => {
+    expect(isPastAcademicMonth(AY, 'April', now)).toBe(true);
+    expect(isPastAcademicMonth(AY, 'July', now)).toBe(true);
+  });
+
+  it('does NOT treat the current month as past', () => {
+    expect(isPastAcademicMonth(AY, 'August', now)).toBe(false);
+  });
+
+  it('does NOT treat future months as past', () => {
+    expect(isPastAcademicMonth(AY, 'September', now)).toBe(false);
+    // Jan–Mar roll into the end year (2027) — still future here.
+    expect(isPastAcademicMonth(AY, 'January', now)).toBe(false);
+    expect(isPastAcademicMonth(AY, 'March', now)).toBe(false);
+  });
+
+  it('handles the Jan–Mar (end-year) months once they have passed', () => {
+    const later = new Date('2027-02-10T00:00:00Z');
+    expect(isPastAcademicMonth(AY, 'January', later)).toBe(true); // Jan 2027 passed
+    expect(isPastAcademicMonth(AY, 'February', later)).toBe(false); // current
+    expect(isPastAcademicMonth(AY, 'December', later)).toBe(true); // Dec 2026 passed
+  });
+
+  it('returns false for unknown months or bad academic-year strings', () => {
+    expect(isPastAcademicMonth(AY, '1st Term Fee', now)).toBe(false);
+    expect(isPastAcademicMonth('2026', 'April', now)).toBe(false);
   });
 });

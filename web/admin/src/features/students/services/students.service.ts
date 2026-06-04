@@ -116,6 +116,10 @@ function mapApiResultToRow(item: Record<string, unknown>, index: number): Studen
   const admissionNumber = String(base.admissionNumber ?? base.admissionNo ?? base.admission_number ?? "");
   const phone = String(base.phone ?? base.phoneNumber ?? base.mobile ?? "");
   const email = String(base.email ?? base.emailId ?? "");
+  const academicYear =
+    (base.academicYear as string | undefined) ??
+    (base.academic_year as string | undefined) ??
+    undefined;
   const amount = String(item.amount ?? base.amount ?? item.feeAmount ?? "—");
   const status = (item.status === "Paid" || item.status === "Pending" ? item.status : "Pending") as "Paid" | "Pending";
   const termFees = parseTermFees(item.termFee ?? item.termFees ?? []);
@@ -146,6 +150,7 @@ function mapApiResultToRow(item: Record<string, unknown>, index: number): Studen
     admissionNumber,
     phone,
     email,
+    academicYear,
     amount,
     status,
     tcIssuedAt,
@@ -195,6 +200,10 @@ function mapStudentWithFeesToRow(payload: Record<string, unknown>): StudentFeeRo
     ),
     phone: String(student.phone ?? student.phoneNumber ?? student.mobile ?? ""),
     email: String(student.email ?? student.emailId ?? ""),
+    academicYear:
+      (student.academicYear as string | undefined) ??
+      (student.academic_year as string | undefined) ??
+      undefined,
     pickupLocation:
       (student.pickupLocation as string | null | undefined) ??
       (student.pickup_location as string | null | undefined) ??

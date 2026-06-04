@@ -12,6 +12,29 @@ const FALLBACK_MONTHS = [
   "October", "November", "December", "January", "February", "March",
 ];
 
+const MONTH_INDEX: Record<string, number> = {
+  January: 0, February: 1, March: 2, April: 3, May: 4, June: 5,
+  July: 6, August: 7, September: 8, October: 9, November: 10, December: 11,
+};
+
+/**
+ * True when an academic-year month (e.g. "April" of "2026-2027") has fully
+ * elapsed — strictly before the current calendar month. The current and
+ * future months return false. Mirrors the API rule.
+ */
+function isPastAcademicMonth(academicYear: string | undefined, month: string): boolean {
+  const idx = MONTH_INDEX[month];
+  if (idx === undefined || !academicYear) return false;
+  const m = academicYear.match(/^(\d{4})-(\d{4})$/);
+  if (!m) return false;
+  const calYear = idx >= 3 ? Number(m[1]) : Number(m[2]);
+  const now = new Date();
+  return (
+    calYear < now.getFullYear() ||
+    (calYear === now.getFullYear() && idx < now.getMonth())
+  );
+}
+
 export interface EditStudentFormProps {
   student: StudentFeeRow;
   formId: string;
@@ -171,17 +194,22 @@ export function EditStudentForm({ student, formId, onSubmit, onStatusChangeToPai
           </h3>
           {isMonthly && (
             <p className="mb-3 text-xs" style={{ color: "var(--app-text-secondary)" }}>
-              Set an amount on a month to add it to this student&apos;s bill. Once
-              a fee is added its amount is fixed and can&apos;t be edited here.
+              Set an amount on a month to add it to this student&apos;s bill. A
+              past month&apos;s amount is fixed and can&apos;t be edited; the
+              current and upcoming months can still be revised.
               {isTransport ? " Boarding/drop can differ by month." : ""}
             </p>
           )}
           <div className="space-y-3">
             {periodNames.map((periodName) => {
               const term = form.termFees[periodName] ?? emptyItem;
-              // Once a fee exists its amount is locked — admins can record
-              // payments / change boarding-drop, but never the amount itself.
               const feeExists = Boolean(term.feeId);
+              // Term amounts are immutable once added. Monthly amounts lock
+              // only after the month has elapsed; current/upcoming months stay
+              // editable, and not-yet-billed months can be added.
+              const amountLocked = isMonthly
+                ? feeExists && isPastAcademicMonth(form.academicYear, periodName)
+                : feeExists;
               return (
                 <div
                   key={periodName}
@@ -196,10 +224,16 @@ export function EditStudentForm({ student, formId, onSubmit, onStatusChangeToPai
                       type="number"
                       value={term.originalAmount ?? term.amount}
                       onChange={(e) => setTermFee(periodName, "originalAmount", Number(e.target.value))}
-                      disabled={feeExists}
-                      readOnly={feeExists}
-                      title={feeExists ? "Fee amount is fixed once added and cannot be edited." : undefined}
-                      className={`${inputClass} ${feeExists ? "cursor-not-allowed opacity-60" : ""}`}
+                      disabled={amountLocked}
+                      readOnly={amountLocked}
+                      title={
+                        amountLocked
+                          ? isMonthly
+                            ? "This month has passed — its fee amount is fixed and cannot be edited."
+                            : "Term fee amount is fixed once added and cannot be edited."
+                          : undefined
+                      }
+                      className={`${inputClass} ${amountLocked ? "cursor-not-allowed opacity-60" : ""}`}
                       style={inputStyle}
                     />
                   </FieldGroup>

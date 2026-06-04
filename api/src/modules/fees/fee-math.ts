@@ -106,3 +106,43 @@ export function deriveStatus(paid: number, net: number): PaymentStatus {
   if (paid < net) return PaymentStatus.PARTIAL;
   return PaymentStatus.PAID;
 }
+
+/** Calendar month index (0–11) for each academic-year month name. */
+const ACADEMIC_MONTH_INDEX: Record<string, number> = {
+  January: 0,
+  February: 1,
+  March: 2,
+  April: 3,
+  May: 4,
+  June: 5,
+  July: 6,
+  August: 7,
+  September: 8,
+  October: 9,
+  November: 10,
+  December: 11,
+};
+
+/**
+ * True when an academic-year month (e.g. "April" of "2026-2027") has fully
+ * elapsed — it falls strictly before the current calendar month. The current
+ * month and any future month return false. Non-month periods (school terms)
+ * and unparseable years return false (never treated as past).
+ *
+ * Apr–Dec belong to the start year; Jan–Mar roll into the end year.
+ */
+export function isPastAcademicMonth(
+  academicYear: string,
+  month: string,
+  now: Date = new Date(),
+): boolean {
+  const idx = ACADEMIC_MONTH_INDEX[month];
+  if (idx === undefined) return false;
+  const m = academicYear.match(/^(\d{4})-(\d{4})$/);
+  if (!m) return false;
+  const calYear = idx >= 3 ? Number(m[1]) : Number(m[2]);
+  return (
+    calYear < now.getFullYear() ||
+    (calYear === now.getFullYear() && idx < now.getMonth())
+  );
+}
